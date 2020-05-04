@@ -10,7 +10,7 @@
 	<script type="module">
 		async function init() {
 			const mem = new WebAssembly.Memory({
-				initial: 2,
+				initial: 10,
 			});
 
 			function dumpMem8(mem) {
@@ -19,6 +19,44 @@
 
 			function dumpMem32(mem) {
 				console.log(new Uint32Array(mem.buffer));
+			}
+
+			function findNonZero(mem) {
+				let currentSection = [];
+				const buf = new Uint8Array(mem.buffer)
+
+				for (let i = 0; i < buf.length; i++) {
+					const v = buf[i];
+					if (v) {
+						currentSection.push(v);
+					} else {
+						if (currentSection.length) {
+							console.log(i, currentSection);
+							currentSection = [];
+						}
+					}
+				}
+
+				if (currentSection.length) {
+					console.log(currentSection);
+				}
+			}
+
+			function getString(ptr) {
+				const codes = [];
+				const buf = new Uint8Array(mem.buffer);
+
+				while (true) {
+					const char = buf[ptr];
+					if (!char) {
+						break;
+					} else {
+						codes.push(char);
+						ptr++;
+					}
+				}
+
+				return String.fromCharCode(...codes);
 			}
 
 			const sysFetch = fetch("/sys.wasm");
@@ -33,13 +71,6 @@
 				}
 			);
 
-			dumpMem8(mem);
-			sys.exports.memset(2, 256+123, 4);
-			sys.exports.memset(6, 256+234, 4);
-			dumpMem8(mem);
-			sys.exports.memcpy(0, 4, 4);
-			dumpMem8(mem);
-
 			const { instance: test } = await WebAssembly.instantiateStreaming(
 				mainFetch,
 				{
@@ -49,25 +80,19 @@
 						printInt: console.log,
 						printLong: console.log,
 						printDouble: console.log,
+						printString: ptr => console.log(getString(ptr)),
 					},
 				}
 			);
 
-			console.log('fib test');
-			console.log(test.exports.fib(20));
-			
-			console.log('qsort test');
-			test.exports.boo();
-			
-			console.log('strlen test');
-			test.exports.goober();
+			test.exports.init();
+			test.exports.frame();
 
-			console.log('sprintf test');
-			test.exports.foop(0);
-			dumpMem8(mem);
-
-			console.log('strtod test');
-			test.exports.glamp();
+			// function doFrame() {
+			// 	test.exports.frame();
+			// 	window.requestAnimationFrame(doFrame);
+			// }
+			// window.requestAnimationFrame(doFrame);
 		}
 		init();
 	</script>

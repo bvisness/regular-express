@@ -4,49 +4,26 @@
 
 #include "microui.h"
 
-extern void printInt(int num);
-extern void printLong(long num);
-extern void printDouble(double num);
-
-int values[] = { 88, 56, 100, 2, 25 };
-
-int cmpfunc(const void * a, const void * b) {
-   return (*(int*)a - *(int*)b);
+static int text_width(mu_Font font, const char *text, int len) {
+  return strlen(text);
 }
 
-int fib(int n) {
-	if (n <= 2) {
-		return 1;
+static int text_height(mu_Font font) {
+  return r_get_text_height();
+}
+
+mu_Context* ctx;
+
+void init() {
+	ctx = malloc(sizeof(mu_Context));
+	mu_init(ctx);
+}
+
+void frame() {
+	if (mu_begin_window(ctx, "My Window", mu_rect(10, 10, 300, 400))) {
+		/* process ui here... */
+		mu_end_window(ctx);
 	}
 
-	return fib(n-2) + fib(n-1);
-}
-
-void boo() {
-	for (int i = 0; i < 5; i++) {
-		printInt(values[i]);
-	}
-
-	qsort(values, 5, sizeof(int), cmpfunc);
-
-	for (int i = 0; i < 5; i++) {
-		printInt(values[i]);
-	}
-}
-
-float blam(int a, int b) {
-	return a - b;
-}
-
-void goober() {
-	printLong(strlen("hello, world"));
-}
-
-void foop(char* s) {
-	sprintf(s, "abc %d", 12);
-}
-
-void glamp() {
-	char* ptr;
-	printDouble(strtod("123.456", &ptr));
+	mu_end(ctx);
 }
