@@ -1,11 +1,11 @@
 #include <stdio.h>
 
-#define STB_SPRINTF_IMPLEMENTATION
-#include <stb_sprintf.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 char* fprintfBuffer = 0;
 
-int fprintf(int nope, const char* format, ...) {
+int fprintf(int fd, const char* format, ...) {
 	if (!fprintfBuffer) {
 		fprintfBuffer = malloc(1024);
 	}
@@ -14,6 +14,11 @@ int fprintf(int nope, const char* format, ...) {
 	va_start(va, format);
 
 	stbsp_vsprintf(fprintfBuffer, format, va);
+	if (fd == stderr) {
+		printError(fprintfBuffer);
+	} else {
+		printString(fprintfBuffer);
+	}
 
 	va_end(va);
 

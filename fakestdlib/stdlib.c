@@ -1,13 +1,18 @@
 #include <stdlib.h>
 
-void* nextAddress = 0;
+extern void* __heap_base;
+
+void* nextAddress;
 void* malloc(size_t bytes) {
+	if (!nextAddress) {
+		nextAddress = &__heap_base;
+	}
+
 	void* address = nextAddress;
 	nextAddress += bytes;
 	printString("Malloc Results (result, next)");
 	printInt(address);
 	printInt(nextAddress);
-	printInt(123467);
 	return address;
 }
 

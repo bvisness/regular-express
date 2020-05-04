@@ -15,7 +15,13 @@ static int text_height(mu_Font font) {
 mu_Context* ctx;
 
 void init() {
+	int* foo = (int*) malloc(sizeof(int));
+	*foo = 12345678;
+	long* blam = (long*) malloc(sizeof(long));
+	*blam = 234567876;
+	malloc(12);
 	ctx = malloc(sizeof(mu_Context));
+
 	mu_init(ctx);
 }
 

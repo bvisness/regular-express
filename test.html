@@ -81,12 +81,16 @@
 						printLong: console.log,
 						printDouble: console.log,
 						printString: ptr => console.log(getString(ptr)),
+						printError: ptr => console.error(getString(ptr)),
 					},
 				}
 			);
 
 			test.exports.init();
+			dumpMem32(mem);
 			test.exports.frame();
+			dumpMem32(mem);
+			console.log(test.exports);
 
 			// function doFrame() {
 			// 	test.exports.frame();

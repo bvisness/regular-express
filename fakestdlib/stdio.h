@@ -1,11 +1,12 @@
 #ifndef FAKESTDLIB_STDIO_H
 #define FAKESTDLIB_STDIO_H
 
-#include <stdarg.h>
-#include <stdlib.h>
 #include <stb_sprintf.h>
 
 #include <debug.h>
+
+#define stdout 0
+#define stderr 1
 
 #define sprintf stbsp_sprintf
 int fprintf(int nope, const char* format, ...);
