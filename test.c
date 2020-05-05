@@ -10,11 +10,14 @@ extern void canvas_rect(int x, int y, int w, int h);
 extern void canvas_text(char* str, int x, int y);
 
 static int text_width(mu_Font font, const char *text, int len) {
-  return strlen(text) * 8;
+	if (len < 0) {
+		len = strlen(text);
+	}
+	return len * 8;
 }
 
 static int text_height(mu_Font font) {
-  return 14;
+	return 14;
 }
 
 mu_Context* ctx;
