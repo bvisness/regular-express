@@ -10,9 +10,6 @@ void* malloc(size_t bytes) {
 
 	void* address = nextAddress;
 	nextAddress += bytes;
-	printString("Malloc Results (result, next)");
-	printInt(address);
-	printInt(nextAddress);
 	return address;
 }
 

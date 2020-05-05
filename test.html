@@ -4,10 +4,29 @@
 <head>
 	<meta charset="UTF-8">
 	<title>WASM Test</title>
+
+	<style>
+		body {
+			padding: 0;
+			margin: 0;
+		}
+
+		canvas {
+			position: absolute;
+			width: 100%;
+			height: 100%;
+		}
+	</style>
 </head>
 
 <body>
+	<canvas width="628" height="959"></canvas>
 	<script type="module">
+		const canvas = document.querySelector('canvas');
+		const ctx = canvas.getContext('2d');
+
+		ctx.textBaseline = "top";
+
 		async function init() {
 			const mem = new WebAssembly.Memory({
 				initial: 10,
@@ -82,15 +101,24 @@
 						printDouble: console.log,
 						printString: ptr => console.log(getString(ptr)),
 						printError: ptr => console.error(getString(ptr)),
+						breakpoint: () => { debugger; },
+
+						canvas_setFillRGB: (r, g, b, a) => {
+							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+						},
+						canvas_rect: (x, y, w, h) => {
+							ctx.fillRect(x, y, w, h);
+						},
+						canvas_text: (strPtr, x, y) => {
+							const str = getString(strPtr);
+							ctx.fillText(str, x, y);
+						},
 					},
 				}
 			);
 
 			test.exports.init();
-			dumpMem32(mem);
 			test.exports.frame();
-			dumpMem32(mem);
-			console.log(test.exports);
 
 			// function doFrame() {
 			// 	test.exports.frame();
