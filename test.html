@@ -20,25 +20,35 @@
 </head>
 
 <body>
-	<canvas width="628" height="959"></canvas>
+	<canvas></canvas>
+	<script type="text/javascript">
+		function dumpMem8(mem) {
+			console.log(new Uint8Array(mem.buffer));
+		}
+
+		function dumpMem32(mem) {
+			console.log(new Uint32Array(mem.buffer));
+		}
+	</script>
 	<script type="module">
 		const canvas = document.querySelector('canvas');
 		const ctx = canvas.getContext('2d');
 
-		ctx.textBaseline = "top";
+		function updateCanvasSize() {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+			ctx.textBaseline = "top";
+			ctx.font = "14px monospace";
+		}
+		updateCanvasSize();
+		window.addEventListener('resize', () => { updateCanvasSize(); });
 
 		async function init() {
 			const mem = new WebAssembly.Memory({
 				initial: 10,
 			});
 
-			function dumpMem8(mem) {
-				console.log(new Uint8Array(mem.buffer));
-			}
-
-			function dumpMem32(mem) {
-				console.log(new Uint32Array(mem.buffer));
-			}
+			window.mem = mem;
 
 			function findNonZero(mem) {
 				let currentSection = [];
@@ -78,6 +88,15 @@
 				return String.fromCharCode(...codes);
 			}
 
+			function putString(ptr, str) {
+				const buf = new Uint8Array(mem.buffer);
+				let i = 0;
+				for (; i < str.length; i++) {
+					buf[ptr + i] = str.charCodeAt(i);
+				}
+				buf[ptr + i] = 0;
+			}
+
 			const sysFetch = fetch("/sys.wasm");
 			const mainFetch = fetch("/test.wasm");
 
@@ -103,6 +122,9 @@
 						printError: ptr => console.error(getString(ptr)),
 						breakpoint: () => { debugger; },
 
+						canvas_clear: () => {
+							ctx.clearRect(0, 0, canvas.width, canvas.height);
+						},
 						canvas_setFillRGB: (r, g, b, a) => {
 							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
 						},
@@ -117,14 +139,36 @@
 				}
 			);
 
-			test.exports.init();
-			test.exports.frame();
+			canvas.addEventListener('mousemove', e => {
+				test.exports.mouseMove(e.clientX, e.clientY);
+			});
+			canvas.addEventListener('mousedown', e => {
+				test.exports.mouseDown(e.clientX, e.clientY);
+			});
+			canvas.addEventListener('mouseup', e => {
+				test.exports.mouseUp(e.clientX, e.clientY);
+			});
+			window.addEventListener('keydown', e => {
+				console.log(e);
+				putString(test.exports.textInputBuf, e.key);
+				test.exports.textInput();
+			});
+			window.addEventListener('paste', e => {
+				putString(
+					test.exports.textInputBuf,
+					e.clipboardData.getData('text/plain')
+				);
+				test.exports.textInput();
+			});
 
-			// function doFrame() {
-			// 	test.exports.frame();
-			// 	window.requestAnimationFrame(doFrame);
-			// }
-			// window.requestAnimationFrame(doFrame);
+			test.exports.init();
+			// test.exports.frame();
+
+			function doFrame() {
+				test.exports.frame();
+				window.requestAnimationFrame(doFrame);
+			}
+			window.requestAnimationFrame(doFrame);
 		}
 		init();
 	</script>

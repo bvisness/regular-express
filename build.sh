@@ -22,6 +22,7 @@ $wasmld \
 	--export-all --no-gc-sections \
 	--allow-undefined \
 	--import-memory \
+    --initial-memory=655360 \
 	--lto-O2 \
 	-o test.wasm \
 	stb_sprintf.o stdio.o stdlib.o string.o test.o microui.o

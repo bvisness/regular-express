@@ -1,5 +1,5 @@
 (module $sys
-	(memory (import "env" "memory") 2)
+	(memory (import "env" "memory") 10)
 	(func (export "abort") unreachable)
 	(func (export "memset")
 		(param $ptr i32) (param $value i32) (param $num i32)
@@ -43,6 +43,14 @@
 		set_local $currentSrc
 		get_local $dst
 		set_local $currentDst
+
+		;; bail early if zero
+		block
+			get_local $count
+			br_if 0
+			get_local $dst
+			return
+		end
 
 		loop
 			;; copy value
