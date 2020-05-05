@@ -3,21 +3,37 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-char* fprintfBuffer = 0;
+char* printfBuffer = 0;
 
-int fprintf(int fd, const char* format, ...) {
-	if (!fprintfBuffer) {
-		fprintfBuffer = malloc(1024);
+int printf(const char* format, ...) {
+	if (!printfBuffer) {
+		printfBuffer = malloc(1024);
 	}
 
 	va_list va;
 	va_start(va, format);
 
-	stbsp_vsprintf(fprintfBuffer, format, va);
+	stbsp_vsprintf(printfBuffer, format, va);
+	printString(printfBuffer);
+
+	va_end(va);
+
+	return 0;
+}
+
+int fprintf(int fd, const char* format, ...) {
+	if (!printfBuffer) {
+		printfBuffer = malloc(1024);
+	}
+
+	va_list va;
+	va_start(va, format);
+
+	stbsp_vsprintf(printfBuffer, format, va);
 	if (fd == stderr) {
-		printError(fprintfBuffer);
+		printError(printfBuffer);
 	} else {
-		printString(fprintfBuffer);
+		printString(printfBuffer);
 	}
 
 	va_end(va);

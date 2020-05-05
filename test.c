@@ -15,11 +15,6 @@ static int text_height(mu_Font font) {
 mu_Context* ctx;
 
 void init() {
-	int* foo = (int*) malloc(sizeof(int));
-	*foo = 12345678;
-	long* blam = (long*) malloc(sizeof(long));
-	*blam = 234567876;
-	malloc(12);
 	ctx = malloc(sizeof(mu_Context));
 
 	mu_init(ctx);
@@ -27,7 +22,9 @@ void init() {
 
 void frame() {
 	if (mu_begin_window(ctx, "My Window", mu_rect(10, 10, 300, 400))) {
-		/* process ui here... */
+		if (mu_button(ctx, "x")) {
+			printf("Pressed button!");
+		}
 		mu_end_window(ctx);
 	}
 

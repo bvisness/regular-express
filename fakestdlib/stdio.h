@@ -9,6 +9,7 @@
 #define stderr 1
 
 #define sprintf stbsp_sprintf
+int printf(const char* format, ...);
 int fprintf(int nope, const char* format, ...);
 double strtod(const char* str, char** endptr);
 
