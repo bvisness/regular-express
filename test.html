@@ -125,6 +125,13 @@
 						canvas_clear: () => {
 							ctx.clearRect(0, 0, canvas.width, canvas.height);
 						},
+						canvas_clip: (x, y, w, h) => {
+							ctx.restore();
+							ctx.save();
+							ctx.beginPath();
+							ctx.rect(x, y, w, h);
+							ctx.clip();
+						},
 						canvas_setFillRGB: (r, g, b, a) => {
 							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
 						},
@@ -159,6 +166,9 @@
 					e.clipboardData.getData('text/plain')
 				);
 				test.exports.textInput();
+			});
+			window.addEventListener('wheel', e => {
+				test.exports.scroll(e.deltaX, e.deltaY);
 			});
 
 			test.exports.init();

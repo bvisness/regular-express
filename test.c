@@ -5,6 +5,7 @@
 #include "microui.h"
 
 extern void canvas_clear();
+extern void canvas_clip(int x, int y, int w, int h);
 extern void canvas_setFillRGB(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 extern void canvas_rect(int x, int y, int w, int h);
 extern void canvas_text(char* str, int x, int y);
@@ -46,12 +47,14 @@ void textInput() {
 	mu_input_text(ctx, textInputBuf);
 }
 
+void scroll(int x, int y) {
+	mu_input_scroll(ctx, x, y);
+}
+
 static  char logbuf[32000];
 static   int logbuf_updated = 0;
 
 void frame() {
-	// mu_input_mousemove(ctx, 0, 0);
-
 	mu_begin(ctx);
 
 	if (mu_begin_window(ctx, "My Window", mu_rect(10, 10, 300, 400))) {
@@ -184,7 +187,11 @@ void frame() {
 				break;
 			}
 			// case MU_COMMAND_ICON: r_draw_icon(cmd->icon.id, cmd->icon.rect, cmd->icon.color); break;
-			// case MU_COMMAND_CLIP: r_set_clip_rect(cmd->clip.rect); break;
+			case MU_COMMAND_CLIP: {
+				mu_Rect rect = cmd->clip.rect;
+				canvas_clip(rect.x, rect.y, rect.w, rect.h);
+				break;
+			}
 		}
     }
 }
