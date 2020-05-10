@@ -10,20 +10,26 @@ extern void canvas_setFillRGB(unsigned char r, unsigned char g, unsigned char b,
 extern void canvas_rect(int x, int y, int w, int h);
 extern void canvas_text(char* str, int x, int y);
 
+extern int measureText(const char* text, int len);
+
 static int text_width(mu_Font font, const char *text, int len) {
 	if (len < 0) {
 		len = strlen(text);
 	}
-	return len * 8;
+
+	return measureText(text, len);
 }
 
+int _textHeight;
 static int text_height(mu_Font font) {
-	return 14;
+	return _textHeight;
 }
 
 mu_Context* ctx;
 
-void init() {
+void init(int textHeight) {
+	_textHeight = textHeight;
+
 	ctx = malloc(sizeof(mu_Context));
 	mu_init(ctx);
 	ctx->text_width = text_width;

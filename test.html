@@ -38,7 +38,7 @@
 			canvas.width = window.innerWidth;
 			canvas.height = window.innerHeight;
 			ctx.textBaseline = "top";
-			ctx.font = "14px monospace";
+			ctx.font = "14px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol";
 		}
 		updateCanvasSize();
 		window.addEventListener('resize', () => { updateCanvasSize(); });
@@ -71,11 +71,11 @@
 				}
 			}
 
-			function getString(ptr) {
+			function getString(ptr, len = null) {
 				const codes = [];
 				const buf = new Uint8Array(mem.buffer);
 
-				while (true) {
+				for (let i = 0; len === null || i < len; i++) {
 					const char = buf[ptr];
 					if (!char) {
 						break;
@@ -142,6 +142,13 @@
 							const str = getString(strPtr);
 							ctx.fillText(str, x, y);
 						},
+
+						measureText: (strPtr, len) => {
+							const str = getString(strPtr, len);
+							const metrics = ctx.measureText(str);
+
+							return metrics.width;
+						},
 					},
 				}
 			);
@@ -206,8 +213,8 @@
 				test.exports.scroll(e.deltaX, e.deltaY);
 			});
 
-			test.exports.init();
-			// test.exports.frame();
+			const textHeight = ctx.measureText('NothinBelowTheBaseline').actualBoundingBoxDescent;
+			test.exports.init(textHeight);
 
 			function doFrame() {
 				test.exports.frame();
