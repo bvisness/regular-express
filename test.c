@@ -42,6 +42,14 @@ void mouseUp(int x, int y) {
 	mu_input_mouseup(ctx, x, y, MU_MOUSE_LEFT);
 }
 
+void keyDown(int key) {
+	mu_input_keydown(ctx, key);
+}
+
+void keyUp(int key) {
+	mu_input_keyup(ctx, key);
+}
+
 char textInputBuf[1024];
 void textInput() {
 	mu_input_text(ctx, textInputBuf);
