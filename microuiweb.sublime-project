@@ -6,8 +6,13 @@
     ],
     "build_systems": [
         {
-            "name": "build.sh",
+            "name": "build.sh (Win)",
             "cmd": ["wsl", "./build.sh"],
+            "working_dir": "$project_path"
+        },
+        {
+            "name": "build.sh (Mac)",
+            "cmd": ["./build.sh"],
             "working_dir": "$project_path"
         }
     ]

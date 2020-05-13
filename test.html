@@ -123,17 +123,19 @@
 							ctx.rect(x, y, w, h);
 							ctx.clip();
 						},
-						canvas_setFillRGB: (r, g, b, a) => {
+						canvas_rect: (x, y, w, h, r, g, b, a) => {
 							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-						},
-						canvas_rect: (x, y, w, h) => {
 							ctx.fillRect(x, y, w, h);
 						},
-						canvas_circle: (x, y, r) => {
-							ctx.arc(x, y, r, 0, 2 * Math.PI);
+						canvas_circle: (x, y, radius, r, g, b, a) => {
+							ctx.beginPath();
+							ctx.arc(x, y, radius, 0, 2 * Math.PI);
+							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+							ctx.fill();
 						},
-						canvas_text: (strPtr, x, y) => {
+						canvas_text: (strPtr, x, y, r, g, b, a) => {
 							const str = getString(strPtr);
+							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
 							ctx.fillText(str, x, y);
 						},
 

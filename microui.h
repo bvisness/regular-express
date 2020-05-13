@@ -40,7 +40,8 @@ enum {
   MU_COMMAND_RECT,
   MU_COMMAND_TEXT,
   MU_COMMAND_ICON,
-  MU_COMMAND_MAX
+  MU_COMMAND_MAX,
+  MU_COMMAND_CIRCLE
 };
 
 enum {
@@ -122,6 +123,7 @@ typedef struct { mu_BaseCommand base; mu_Rect rect; } mu_ClipCommand;
 typedef struct { mu_BaseCommand base; mu_Rect rect; mu_Color color; } mu_RectCommand;
 typedef struct { mu_BaseCommand base; mu_Font font; mu_Vec2 pos; mu_Color color; char str[1]; } mu_TextCommand;
 typedef struct { mu_BaseCommand base; mu_Rect rect; int id; mu_Color color; } mu_IconCommand;
+typedef struct { mu_BaseCommand base; int x; int y; float radius; mu_Color color; } mu_CircleCommand;
 
 typedef union {
   int type;
@@ -131,6 +133,7 @@ typedef union {
   mu_RectCommand rect;
   mu_TextCommand text;
   mu_IconCommand icon;
+  mu_CircleCommand circle;
 } mu_Command;
 
 typedef struct {
@@ -251,6 +254,7 @@ void mu_draw_rect(mu_Context *ctx, mu_Rect rect, mu_Color color);
 void mu_draw_box(mu_Context *ctx, mu_Rect rect, mu_Color color);
 void mu_draw_text(mu_Context *ctx, mu_Font font, const char *str, int len, mu_Vec2 pos, mu_Color color);
 void mu_draw_icon(mu_Context *ctx, int id, mu_Rect rect, mu_Color color);
+void mu_draw_circle(mu_Context *ctx, int x, int y, float radius, mu_Color color);
 
 void mu_layout_row(mu_Context *ctx, int items, const int *widths, int height);
 void mu_layout_width(mu_Context *ctx, int width);

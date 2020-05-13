@@ -520,6 +520,16 @@ void mu_draw_icon(mu_Context *ctx, int id, mu_Rect rect, mu_Color color) {
 }
 
 
+void mu_draw_circle(mu_Context *ctx, int x, int y, float radius, mu_Color color) {
+  mu_Command *cmd;
+  cmd = mu_push_command(ctx, MU_COMMAND_CIRCLE, sizeof(mu_CircleCommand));
+  cmd->circle.x = x;
+  cmd->circle.y = y;
+  cmd->circle.radius = radius;
+  cmd->circle.color = color;
+}
+
+
 /*============================================================================
 ** layout
 **============================================================================*/
@@ -1087,6 +1097,16 @@ int mu_begin_window_ex(mu_Context *ctx, const char *title, mu_Rect rect, int opt
 
   if (cnt->rect.w == 0) { cnt->rect = rect; }
   begin_root_container(ctx, cnt);
+
+  /* process dragging early */
+  mu_Id titleId = mu_get_id(ctx, "!title", 6);
+  if (~opt & MU_OPT_NOTITLE) {
+    if (titleId == ctx->focus && ctx->mouse_down == MU_MOUSE_LEFT) {
+      cnt->rect.x += ctx->mouse_delta.x;
+      cnt->rect.y += ctx->mouse_delta.y;
+    }
+  }
+
   rect = body = cnt->rect;
 
   /* draw frame */
@@ -1101,17 +1121,10 @@ int mu_begin_window_ex(mu_Context *ctx, const char *title, mu_Rect rect, int opt
     ctx->draw_frame(ctx, tr, MU_COLOR_TITLEBG);
 
     /* do title text */
-    if (~opt & MU_OPT_NOTITLE) {
-      mu_Id id = mu_get_id(ctx, "!title", 6);
-      mu_update_control(ctx, id, tr, opt);
-      mu_draw_control_text(ctx, title, tr, MU_COLOR_TITLETEXT, opt);
-      if (id == ctx->focus && ctx->mouse_down == MU_MOUSE_LEFT) {
-        cnt->rect.x += ctx->mouse_delta.x;
-        cnt->rect.y += ctx->mouse_delta.y;
-      }
-      body.y += tr.h;
-      body.h -= tr.h;
-    }
+    mu_update_control(ctx, titleId, tr, opt);
+    mu_draw_control_text(ctx, title, tr, MU_COLOR_TITLETEXT, opt);
+    body.y += tr.h;
+    body.h -= tr.h;
 
     /* do `close` button */
     if (~opt & MU_OPT_NOCLOSE) {
