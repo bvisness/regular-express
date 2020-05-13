@@ -34,15 +34,6 @@
 		const canvas = document.querySelector('canvas');
 		const ctx = canvas.getContext('2d');
 
-		function updateCanvasSize() {
-			canvas.width = window.innerWidth;
-			canvas.height = window.innerHeight;
-			ctx.textBaseline = "top";
-			ctx.font = "14px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol";
-		}
-		updateCanvasSize();
-		window.addEventListener('resize', () => { updateCanvasSize(); });
-
 		async function init() {
 			const mem = new WebAssembly.Memory({
 				initial: 10,
@@ -138,6 +129,9 @@
 						canvas_rect: (x, y, w, h) => {
 							ctx.fillRect(x, y, w, h);
 						},
+						canvas_circle: (x, y, r) => {
+							ctx.arc(x, y, r, 0, 2 * Math.PI);
+						},
 						canvas_text: (strPtr, x, y) => {
 							const str = getString(strPtr);
 							ctx.fillText(str, x, y);
@@ -157,12 +151,15 @@
 
 			canvas.addEventListener('mousemove', e => {
 				test.exports.mouseMove(e.clientX, e.clientY);
+				window.requestAnimationFrame(doFrame);
 			});
 			canvas.addEventListener('mousedown', e => {
 				test.exports.mouseDown(e.clientX, e.clientY);
+				window.requestAnimationFrame(doFrame);
 			});
 			canvas.addEventListener('mouseup', e => {
 				test.exports.mouseUp(e.clientX, e.clientY);
+				window.requestAnimationFrame(doFrame);
 			});
 
 			function specialKeyEvent(downOrUp, e) {
@@ -195,11 +192,13 @@
 					putString(test.exports.textInputBuf, e.key);
 					test.exports.textInput();
 				}
+				window.requestAnimationFrame(doFrame);
 			});
 			window.addEventListener('keyup', e => {
 				if (e.key.length > 1) {
 					specialKeyEvent('up', e);
 				}
+				window.requestAnimationFrame(doFrame);
 			});
 
 			window.addEventListener('paste', e => {
@@ -208,17 +207,38 @@
 					e.clipboardData.getData('text/plain')
 				);
 				test.exports.textInput();
+				window.requestAnimationFrame(doFrame);
 			});
 			window.addEventListener('wheel', e => {
-				test.exports.scroll(e.deltaX, e.deltaY);
+				let x = e.deltaX;
+				let y = e.deltaY;
+
+				if (e.deltaMode === 1) {
+					// "lines"
+					x *= 20;
+					y *= 20;
+				}
+
+				test.exports.scroll(x, y);
+				window.requestAnimationFrame(doFrame);
 			});
+
+			function updateCanvasSize() {
+				canvas.width = window.innerWidth;
+				canvas.height = window.innerHeight;
+				ctx.textBaseline = "top";
+				ctx.font = "14px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol";
+
+				window.requestAnimationFrame(doFrame);
+			}
+			updateCanvasSize();
+			window.addEventListener('resize', () => { updateCanvasSize(); });
 
 			const textHeight = ctx.measureText('NothinBelowTheBaseline').actualBoundingBoxDescent;
 			test.exports.init(textHeight);
 
 			function doFrame() {
 				test.exports.frame();
-				window.requestAnimationFrame(doFrame);
 			}
 			window.requestAnimationFrame(doFrame);
 		}

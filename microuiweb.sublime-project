@@ -1,0 +1,14 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "build_systems": [
+        {
+            "name": "build.sh",
+            "cmd": ["wsl", "./build.sh"],
+            "working_dir": "$project_path"
+        }
+    ]
+}
