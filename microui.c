@@ -1099,12 +1099,16 @@ int mu_begin_window_ex(mu_Context *ctx, const char *title, mu_Rect rect, int opt
   begin_root_container(ctx, cnt);
 
   /* process dragging early */
-  mu_Id titleId = mu_get_id(ctx, "!title", 6);
+  mu_Id titleId;
   if (~opt & MU_OPT_NOTITLE) {
+    titleId = mu_get_id(ctx, "!title", 6);
     if (titleId == ctx->focus && ctx->mouse_down == MU_MOUSE_LEFT) {
       cnt->rect.x += ctx->mouse_delta.x;
       cnt->rect.y += ctx->mouse_delta.y;
     }
+  } else {
+    /* if no title, always update position */
+    cnt->rect = rect;
   }
 
   rect = body = cnt->rect;

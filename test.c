@@ -74,9 +74,16 @@ static   int logbuf_updated = 0;
 void frame() {
 	mu_begin(ctx);
 
-	if (mu_begin_window(ctx, "Window A", mu_rect(10, 10, 300, 200))) {
+	if (mu_begin_window_ex(ctx, "Window A", mu_rect(10, 10, 300, 200), MU_OPT_NOTITLE)) {
+		mu_button(ctx, "YO");
+
+		static float value;
+		mu_slider_ex(ctx, &value, 0, 20, 0, "(%.2f)", MU_OPT_ALIGNCENTER);
+
 		mu_Container* cont = mu_get_current_container(ctx);
+		mu_layout_set_next(ctx, mu_rect(cont->rect.x + cont->rect.w - 20, cont->rect.y + 30, 40, 40), 0);
 		mu_draw_circle(ctx, cont->rect.x + cont->rect.w, cont->rect.y + 30, 10.0f, mu_color(100, 100, 100, 255));
+		// mu_button(ctx, "OVER HERE");
 
 		mu_end_window(ctx);
 	}
@@ -91,10 +98,6 @@ void frame() {
 	mu_Command *cmd = NULL;
     while (mu_next_command(ctx, &cmd)) {
 		switch (cmd->type) {
-			// case MU_COMMAND_TEXT: r_draw_text(cmd->text.str, cmd->text.pos, cmd->text.color); break;
-			// case MU_COMMAND_RECT: r_draw_rect(cmd->rect.rect, cmd->rect.color); break;
-			// case MU_COMMAND_ICON: r_draw_icon(cmd->icon.id, cmd->icon.rect, cmd->icon.color); break;
-			// case MU_COMMAND_CLIP: r_set_clip_rect(cmd->clip.rect); break;
 			case MU_COMMAND_TEXT: {
 				mu_Vec2 pos = cmd->text.pos;
 				mu_Color color = cmd->text.color;
