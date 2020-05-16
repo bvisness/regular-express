@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "microui.h"
+#include "regex/regex.h"
 
 #define COLORPARAMS unsigned char r, unsigned char g, unsigned char b, unsigned char a
 
@@ -32,6 +33,38 @@ mu_Context* ctx;
 
 void init(int textHeight) {
 	_textHeight = textHeight;
+
+	Special start = { .Type = RE_SPECIAL_STRINGSTART };
+	Char a = { .Type = RE_CHAR_LITERAL, .Literal = 'a' };
+	Char b = { .Type = RE_CHAR_LITERAL, .Literal = 'b' };
+	Char z = { .Type = RE_CHAR_LITERAL, .Literal = 'z' };
+	Char s = { .Type = RE_CHAR_META, .Meta = 's' };
+	SetItemRange az = { .Min = &a, .Max = &z };
+	SetItem azItem = { .Type = RE_SETITEM_RANGE, .Range = &az };
+	SetItem bItem = { .Type = RE_SETITEM_CHAR, .Char = &b };
+	Set pos = { .NumItems = 2, .Items[0] = &azItem, .Items[1] = &bItem, .IsNegative = 0 };
+	Set neg = { .NumItems = 1, .Items[0] = &azItem, .IsNegative = 1 };
+	UnitRepetition plus = { .Min = 1, .Max = -1 };
+	UnitRepetition star = { .Min = 0, .Max = -1 };
+	UnitContents aContents = { .Type = RE_CONTENTS_CHAR, .Char = &b };
+	UnitContents sContents = { .Type = RE_CONTENTS_CHAR, .Char = &s };
+	UnitContents startContents = { .Type = RE_CONTENTS_SPECIAL, .Special = &start };
+	UnitContents posContents = { .Type = RE_CONTENTS_SET, .Set = &pos };
+	UnitContents negContents = { .Type = RE_CONTENTS_SET, .Set = &neg };
+	Unit u1 = { .Contents = &aContents, .Repetition = NULL };
+	Unit u2 = { .Contents = &sContents, .Repetition = &plus };
+	Unit u3 = { .Contents = &posContents, .Repetition = NULL };
+	Unit u4 = { .Contents = &negContents, .Repetition = &star };
+	NoUnionEx nex = {
+		.NumUnits = 4,
+		.Units[0] = &u1,
+		.Units[1] = &u2,
+		.Units[2] = &u3,
+		.Units[3] = &u4,
+	};
+	Regex regex = { .NumUnionMembers = 1, .UnionMembers[0] = &nex };
+
+	printString(ToString(&regex));
 
 	ctx = malloc(sizeof(mu_Context));
 	mu_init(ctx);
