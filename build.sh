@@ -19,6 +19,7 @@ $clang $flags -o string.o fakestdlib/string.c
 $clang $flags -o test.o test.c
 $clang $flags -o microui.o microui.c
 $clang $flags -o regex.o regex/regex.c
+$clang $flags -o pool.o regex/pool.c
 
 $wasmld \
 	--no-entry \
@@ -28,4 +29,4 @@ $wasmld \
     --initial-memory=655360 \
 	--lto-O2 \
 	-o test.wasm \
-	stb_sprintf.o stdio.o stdlib.o string.o test.o microui.o regex.o
+	stb_sprintf.o stdio.o stdlib.o string.o test.o microui.o regex.o pool.o

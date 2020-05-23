@@ -1107,8 +1107,10 @@ int mu_begin_window_ex(mu_Context *ctx, const char *title, mu_Rect rect, int opt
       cnt->rect.y += ctx->mouse_delta.y;
     }
   } else {
-    /* if no title, always update position */
-    cnt->rect = rect;
+    /* if no title, and not a popup, always update position */
+    if (~opt & MU_OPT_POPUP) {
+      cnt->rect = rect;
+    }
   }
 
   rect = body = cnt->rect;

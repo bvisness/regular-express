@@ -10,16 +10,19 @@
 #define MAX_UNIT_CHARS 256
 
 enum {
-    RE_CONTENTS_GROUP,
-    RE_CONTENTS_SET,
+    RE_CONTENTS_LITCHAR,
+    RE_CONTENTS_METACHAR,
     RE_CONTENTS_SPECIAL,
-    RE_CONTENTS_CHAR,
+    RE_CONTENTS_SET,
+    RE_CONTENTS_GROUP,
 };
+const char* RE_CONTENTS_ToString(int v);
 
 enum {
-    RE_SETITEM_CHAR,
+    RE_SETITEM_LITCHAR,
     RE_SETITEM_RANGE,
 };
+const char* RE_SETITEM_ToString(int v);
 
 enum {
     RE_SPECIAL_ANY,
@@ -27,15 +30,11 @@ enum {
     RE_SPECIAL_STRINGEND,
 };
 
-enum {
-    RE_CHAR_LITERAL,
-    RE_CHAR_META,
-};
-
-typedef struct Regex {
+typedef struct Regex Regex;
+struct Regex {
     int NumUnionMembers;
     struct NoUnionEx* UnionMembers[MAX_UNION_MEMBERS];
-} Regex;
+};
 
 typedef struct NoUnionEx {
     int NumUnits;
@@ -44,23 +43,27 @@ typedef struct NoUnionEx {
 
 typedef struct Unit {
     struct UnitContents* Contents;
+
+    int Repeats;
     struct UnitRepetition* Repetition;
 } Unit;
 
 typedef struct UnitContents {
     int Type;
 
-    union {
-        struct Group* Group;
-        struct Set* Set;
-        struct Special* Special;
-        struct Char* Char;
-    };
+    struct LitChar* LitChar;
+    struct MetaChar* MetaChar;
+    struct Special* Special;
+    struct Set* Set;
+    struct Group* Group;
 } UnitContents;
 
 typedef struct UnitRepetition {
     int Min;
-    int Max; // assume that less than zero means unbounded
+    int Max; // assume that zero means unbounded
+
+    float _minbuf;
+    float _maxbuf;
 } UnitRepetition;
 
 typedef struct Group {
@@ -78,30 +81,50 @@ typedef struct Set {
 typedef struct SetItem {
     int Type;
 
-    union {
-        struct Char* Char;
-        struct SetItemRange* Range;
-    };
+    struct LitChar* LitChar;
+    struct SetItemRange* Range;
 } SetItem;
 
 typedef struct SetItemRange {
-    struct Char* Min;
-    struct Char* Max;
+    struct LitChar* Min;
+    struct LitChar* Max;
 } SetItemRange;
 
 typedef struct Special {
     int Type;
 } Special;
 
-typedef struct Char {
-    int Type;
-
+typedef struct LitChar {
     union {
-        char Literal;
-        char Meta;
+        char C;
+        char _buf[2];
     };
-} Char;
+} LitChar;
+
+typedef struct MetaChar {
+    union {
+        char C;
+        char _buf[2];
+    };
+} MetaChar;
+
+typedef union RegexType {
+    Regex Regex;
+    NoUnionEx NoUnionEx;
+    Unit Unit;
+    UnitContents UnitContents;
+    UnitRepetition UnitRepetition;
+    Group Group;
+    Set Set;
+    SetItem SetItem;
+    SetItemRange SetItemRange;
+    Special Special;
+    LitChar LitChar;
+    MetaChar MetaChar;
+} RegexType;
+
 
 char* ToString(Regex* regex);
+
 
 #endif
