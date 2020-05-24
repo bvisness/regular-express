@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "vec.h"
+
 #define MAX_UNION_MEMBERS 256
 #define MAX_UNITS 256
 #define MAX_SET_ITEMS 256
@@ -34,11 +36,15 @@ typedef struct Regex Regex;
 struct Regex {
     int NumUnionMembers;
     struct NoUnionEx* UnionMembers[MAX_UNION_MEMBERS];
+
+    Vec2i Size;
 };
 
 typedef struct NoUnionEx {
     int NumUnits;
     struct Unit* Units[MAX_UNITS];
+
+    Vec2i Size;
 } NoUnionEx;
 
 typedef struct Unit {
@@ -46,6 +52,8 @@ typedef struct Unit {
 
     int Repeats;
     struct UnitRepetition* Repetition;
+
+    Vec2i Size;
 } Unit;
 
 typedef struct UnitContents {
@@ -56,6 +64,8 @@ typedef struct UnitContents {
     struct Special* Special;
     struct Set* Set;
     struct Group* Group;
+
+    Vec2i Size;
 } UnitContents;
 
 typedef struct UnitRepetition {
@@ -64,11 +74,15 @@ typedef struct UnitRepetition {
 
     float _minbuf;
     float _maxbuf;
+
+    Vec2i Size;
 } UnitRepetition;
 
 typedef struct Group {
     struct Regex* Regex;
     // more properties eventually, like names
+
+    Vec2i Size;
 } Group;
 
 typedef struct Set {
@@ -76,6 +90,8 @@ typedef struct Set {
     struct SetItem* Items[MAX_SET_ITEMS];
 
     int IsNegative;
+
+    Vec2i Size;
 } Set;
 
 typedef struct SetItem {
@@ -102,6 +118,7 @@ typedef struct LitChar {
 } LitChar;
 
 typedef struct MetaChar {
+    char _backslash;
     union {
         char C;
         char _buf[2];

@@ -5,6 +5,7 @@
 #include "microui.h"
 #include "regex/regex.h"
 #include "regex/pool.h"
+#include "regex/vec.h"
 
 #define COLORPARAMS unsigned char r, unsigned char g, unsigned char b, unsigned char a
 
@@ -59,6 +60,22 @@ void textInput() {
 
 void scroll(int x, int y) {
 	mu_input_scroll(ctx, x, y);
+}
+
+int imax(int a, int b) {
+	if (a > b) {
+		return a;
+	} else {
+		return b;
+	}
+}
+
+int imin(int a, int b) {
+	if (a < b) {
+		return a;
+	} else {
+		return b;
+	}
 }
 
 int fround(float f) {
@@ -129,6 +146,7 @@ LitChar* LitChar_init(LitChar* c) {
 }
 
 MetaChar* MetaChar_init(MetaChar* c) {
+	c->_backslash = '\\';
 	c->C = 'a';
 	return c;
 }
@@ -408,6 +426,161 @@ void doTree_Group(Group* group) {
 	mu_pop_id(ctx);
 }
 
+static const int UNION_VERTICAL_SPACING = 10;
+static const int UNIT_HORIZONTAL_SPACING = 5;
+
+Vec2i computeSize_Regex(Regex* regex);
+Vec2i computeSize_NoUnionEx(NoUnionEx* ex);
+Vec2i computeSize_Unit(Unit* unit);
+Vec2i computeSize_UnitContents(UnitContents* contents);
+Vec2i computeSize_Group(Group* group);
+
+Vec2i computeSize_Regex(Regex* regex) {
+	int w = 0;
+	int h = 0;
+	for (int i = 0; i < regex->NumUnionMembers; i++) {
+		NoUnionEx* member = regex->UnionMembers[i];
+		Vec2i memberSize = computeSize_NoUnionEx(member);
+
+		w = imax(w, memberSize.w);
+		h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + memberSize.h;
+	}
+
+	regex->Size = (Vec2i) { .w = w, .h = h };
+
+	return regex->Size;
+}
+
+Vec2i computeSize_NoUnionEx(NoUnionEx* ex) {
+	int w = 0;
+	int h = 0;
+
+	for (int j = 0; j < ex->NumUnits; j++) {
+		Unit* unit = ex->Units[j];
+		Vec2i unitSize = computeSize_Unit(unit);
+
+		w += (j != 0 ? UNIT_HORIZONTAL_SPACING : 0) + unitSize.w;
+		h = imax(h, unitSize.h);
+	}
+
+	ex->Size = (Vec2i) { .w = w, .h = h };
+
+	return ex->Size;
+}
+
+Vec2i computeSize_Unit(Unit* unit) {
+	Vec2i contentsSize = computeSize_UnitContents(unit->Contents);
+	unit->Size = (Vec2i) { .w = contentsSize.w + 6, .h = contentsSize.h + 6 };
+
+	return unit->Size;
+}
+
+Vec2i computeSize_UnitContents(UnitContents* contents) {
+	switch (contents->Type) {
+		case RE_CONTENTS_LITCHAR: {
+			contents->Size = (Vec2i) { .w = 20, .h = 20 };
+		} break;
+		case RE_CONTENTS_METACHAR: {
+			contents->Size = (Vec2i) { .w = 20, .h = 20 };
+		} break;
+		case RE_CONTENTS_SPECIAL: {
+			contents->Size = (Vec2i) { .w = 20, .h = 20 };
+		} break;
+		case RE_CONTENTS_SET: {
+			contents->Size = (Vec2i) { .w = 80, .h = 20 };
+		} break;
+		case RE_CONTENTS_GROUP: {
+			Vec2i groupSize = computeSize_Group(contents->Group);
+			contents->Size = (Vec2i) { .w = groupSize.w + 20, .h = groupSize.h + 20 };
+		}
+	}
+
+	return contents->Size;
+}
+
+Vec2i computeSize_Group(Group* group) {
+	Vec2i regexSize = computeSize_Regex(group->Regex);
+	group->Size = (Vec2i) { .w = regexSize.w + 10, .h = regexSize.h + 10};
+
+	return group->Size;
+}
+
+void drawRailroad_Regex(Regex* regex, Vec2i origin);
+void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin);
+void drawRailroad_Unit(Unit* unit, Vec2i origin);
+void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin);
+void drawRailroad_Group(Group* group, Vec2i origin);
+
+void drawRailroad_Regex(Regex* regex, Vec2i origin) {
+	Vec2i memberOrigin = origin;
+
+	for (int i = 0; i < regex->NumUnionMembers; i++) {
+		NoUnionEx* member = regex->UnionMembers[i];
+		drawRailroad_NoUnionEx(member, memberOrigin);
+
+		memberOrigin.y += UNION_VERTICAL_SPACING + member->Size.h;
+	}
+}
+
+void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin) {
+	Vec2i unitOrigin = origin;
+	for (int i = 0; i < ex->NumUnits; i++) {
+		Unit* unit = ex->Units[i];
+		drawRailroad_Unit(unit, unitOrigin);
+
+		unitOrigin.x += UNIT_HORIZONTAL_SPACING + unit->Size.w;
+	}
+}
+
+void drawRailroad_Unit(Unit* unit, Vec2i origin) {
+	mu_draw_rect(
+		ctx,
+		mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h),
+		mu_color(200, 200, 200, 255)
+	);
+	drawRailroad_UnitContents(unit->Contents, (Vec2i) { .x = origin.x + 3, .y = origin.y + 3 });
+}
+
+void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
+	mu_Rect r = mu_rect(origin.x, origin.y, contents->Size.w, contents->Size.h);
+
+	mu_draw_rect(
+		ctx,
+		r,
+		mu_color(150, 150, 150, 255)
+	);
+
+	mu_layout_set_next(ctx, r, 0);
+	switch (contents->Type) {
+		case RE_CONTENTS_LITCHAR: {
+			mu_label(ctx, contents->LitChar->_buf);
+		} break;
+		case RE_CONTENTS_METACHAR: {
+			mu_label(ctx, &contents->MetaChar->_backslash);
+		} break;
+		case RE_CONTENTS_SPECIAL: {
+			// TODO: DO IT
+		} break;
+		case RE_CONTENTS_SET: {
+			// TODO: Set
+		} break;
+		case RE_CONTENTS_GROUP: {
+			// TODO: Change the origin?
+			drawRailroad_Group(contents->Group, (Vec2i) { .x = origin.x + 10, .y = origin.y + 10 });
+		} break;
+	}
+}
+
+void drawRailroad_Group(Group* group, Vec2i origin) {
+	mu_draw_rect(
+		ctx,
+		mu_rect(origin.x, origin.y, group->Size.w, group->Size.h),
+		mu_color(100, 100, 100, 255)
+	);
+
+	drawRailroad_Regex(group->Regex, (Vec2i) { .x = origin.x + 5, .y = origin.y + 5 });
+}
+
 void frame() {
 	mu_begin(ctx);
 
@@ -421,6 +594,12 @@ void frame() {
 		mu_layout_row(ctx, 1, (int[]) { -1 }, -1);
 		mu_label(ctx, ToString(regex));
 
+		mu_end_window(ctx);
+	}
+
+	computeSize_Regex(regex);
+	if (mu_begin_window_ex(ctx, "Test", mu_rect(520, 300, 500, 500), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
+		drawRailroad_Regex(regex, (Vec2i) { .x = 520, .y = 300 });
 		mu_end_window(ctx);
 	}
 
