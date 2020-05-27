@@ -205,7 +205,7 @@ void doTree(Regex* regex) {
 }
 
 void doTree_Regex(Regex* regex) {
-	mu_push_id(ctx, regex, sizeof(Regex));
+	mu_push_id(ctx, &regex, sizeof(Regex*));
 
 	if (mu_begin_treenode_ex(ctx, "Union", MU_OPT_EXPANDED)) {
 		mu_layout_row(ctx, 2, (int[]) { 20, 20 }, 0);
@@ -234,7 +234,7 @@ void doTree_Regex(Regex* regex) {
 }
 
 void doTree_NoUnionEx(NoUnionEx* ex) {
-	mu_push_id(ctx, ex, sizeof(NoUnionEx));
+	mu_push_id(ctx, &ex, sizeof(NoUnionEx*));
 
 	if (mu_begin_treenode_ex(ctx, "Units", MU_OPT_EXPANDED)) {
 		mu_layout_row(ctx, 2, (int[]) { 20, 20 }, 0);
@@ -262,7 +262,7 @@ void doTree_NoUnionEx(NoUnionEx* ex) {
 }
 
 void doTree_Unit(Unit* unit) {
-	mu_push_id(ctx, unit, sizeof(Unit));
+	mu_push_id(ctx, &unit, sizeof(Unit*));
 
 	if (mu_begin_treenode_ex(ctx, "Unit", MU_OPT_EXPANDED)) {
 		if (mu_button(ctx, RE_CONTENTS_ToString(unit->Contents->Type))) {
@@ -333,7 +333,7 @@ void doTree_Unit(Unit* unit) {
 }
 
 void doTree_LitChar(LitChar* c) {
-	mu_push_id(ctx, c, sizeof(LitChar));
+	mu_push_id(ctx, &c, sizeof(LitChar*));
 
 	mu_layout_row(ctx, 2, (int[]) { 40, -1 }, 0);
 	mu_textbox(ctx, c->_buf, sizeof(char) * 2);
@@ -343,7 +343,7 @@ void doTree_LitChar(LitChar* c) {
 }
 
 void doTree_MetaChar(MetaChar* c) {
-	mu_push_id(ctx, c, sizeof(MetaChar));
+	mu_push_id(ctx, &c, sizeof(MetaChar*));
 
 	mu_layout_row(ctx, 2, (int[]) { 40, -1 }, 0);
 	mu_textbox(ctx, c->_buf, sizeof(char) * 2);
@@ -353,7 +353,7 @@ void doTree_MetaChar(MetaChar* c) {
 }
 
 void doTree_Set(Set* set) {
-	mu_push_id(ctx, set, sizeof(Set));
+	mu_push_id(ctx, &set, sizeof(Set*));
 
 	if (mu_begin_treenode_ex(ctx, "Set", MU_OPT_EXPANDED)) {
 		mu_checkbox(ctx, "Negative", &set->IsNegative);
@@ -383,7 +383,7 @@ void doTree_Set(Set* set) {
 }
 
 void doTree_SetItem(SetItem* item) {
-	mu_push_id(ctx, item, sizeof(SetItem));
+	mu_push_id(ctx, &item, sizeof(SetItem*));
 
 	mu_layout_row(ctx, 0, NULL, 0);
 	if (mu_button(ctx, RE_SETITEM_ToString(item->Type))) {
@@ -415,7 +415,7 @@ void doTree_SetItem(SetItem* item) {
 }
 
 void doTree_Group(Group* group) {
-	mu_push_id(ctx, group, sizeof(Group));
+	mu_push_id(ctx, &group, sizeof(Group*));
 
 	if (mu_begin_treenode_ex(ctx, "Group", MU_OPT_EXPANDED)) {
 		doTree_Regex(group->Regex);
