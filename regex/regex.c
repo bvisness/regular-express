@@ -1,10 +1,19 @@
 #include "regex.h"
 
+void Unit_SetRepeatMin(Unit* unit, int val) {
+    unit->RepeatMin = val;
+    unit->_minbuf = (float) val;
+}
+
+void Unit_SetRepeatMax(Unit* unit, int val) {
+    unit->RepeatMax = val;
+    unit->_maxbuf = (float) val;
+}
+
 char* toString_Regex(char* base, Regex* regex);
 char* toString_NoUnionEx(char* base, NoUnionEx* ex);
 char* toString_Unit(char* base, Unit* unit);
 char* toString_UnitContents(char* base, UnitContents* contents);
-char* toString_UnitRepetition(char* base, UnitRepetition* rep);
 char* toString_Group(char* base, Group* group);
 char* toString_Set(char* base, Set* set);
 char* toString_SetItem(char* base, SetItem* item);
@@ -90,8 +99,23 @@ char* toString_Unit(char* base, Unit* unit) {
     }
 
     base = toString_UnitContents(base, unit->Contents);
-    if (unit->Repeats) {
-        base = toString_UnitRepetition(base, unit->Repetition);
+
+    if (unit->RepeatMin == 1 && unit->RepeatMax == 1) {
+        // do nothing, this is the default
+    } else if (unit->RepeatMin == 0 && unit->RepeatMax == 0) {
+        base = writeLiteral(base, "*");
+    } else if (unit->RepeatMin == 1 && unit->RepeatMax == 0) {
+        base = writeLiteral(base, "+");
+    } else if (unit->RepeatMin == 0 && unit->RepeatMax == 1) {
+        base = writeLiteral(base, "?");
+    } else {
+        base = writeLiteral(base, "{");
+        base += sprintf(base, "%d", unit->RepeatMin);
+        base = writeLiteral(base, ",");
+        if (unit->RepeatMax >= 0) {
+            base += sprintf(base, "%d", unit->RepeatMax);
+        }
+        base = writeLiteral(base, "}");
     }
 
     return base;
@@ -118,30 +142,6 @@ char* toString_UnitContents(char* base, UnitContents* contents) {
         case RE_CONTENTS_METACHAR: {
             base = toString_MetaChar(base, contents->MetaChar);
         } break;
-    }
-
-    return base;
-}
-
-char* toString_UnitRepetition(char* base, UnitRepetition* rep) {
-    if (rep == NULL) {
-        return base;
-    }
-
-    if (rep->Min == 0 && rep->Max == 0) {
-        base = writeLiteral(base, "*");
-    } else if (rep->Min == 1 && rep->Max == 0) {
-        base = writeLiteral(base, "+");
-    } else if (rep->Min == 0 && rep->Max == 1) {
-        base = writeLiteral(base, "?");
-    } else {
-        base = writeLiteral(base, "{");
-        base += sprintf(base, "%d", rep->Min);
-        base = writeLiteral(base, ",");
-        if (rep->Max >= 0) {
-            base += sprintf(base, "%d", rep->Max);
-        }
-        base = writeLiteral(base, "}");
     }
 
     return base;

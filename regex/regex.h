@@ -50,11 +50,17 @@ typedef struct NoUnionEx {
 typedef struct Unit {
     struct UnitContents* Contents;
 
-    int Repeats;
-    struct UnitRepetition* Repetition;
+    int RepeatMin;
+    int RepeatMax; // zero means unbounded
+
+    float _minbuf;
+    float _maxbuf;
 
     Vec2i Size;
 } Unit;
+
+void Unit_SetRepeatMin(Unit* unit, int val);
+void Unit_SetRepeatMax(Unit* unit, int val);
 
 typedef struct UnitContents {
     int Type;
@@ -67,16 +73,6 @@ typedef struct UnitContents {
 
     Vec2i Size;
 } UnitContents;
-
-typedef struct UnitRepetition {
-    int Min;
-    int Max; // assume that zero means unbounded
-
-    float _minbuf;
-    float _maxbuf;
-
-    Vec2i Size;
-} UnitRepetition;
 
 typedef struct Group {
     struct Regex* Regex;
@@ -130,7 +126,6 @@ typedef union RegexType {
     NoUnionEx NoUnionEx;
     Unit Unit;
     UnitContents UnitContents;
-    UnitRepetition UnitRepetition;
     Group Group;
     Set Set;
     SetItem SetItem;

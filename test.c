@@ -89,6 +89,18 @@ int fround(float f) {
 // --------------------------------------------------------------------
 // --------------------------------------------------------------------
 
+typedef struct DragContext {
+	Unit* Unit;
+	int StartedWhere;
+} DragContext;
+
+enum {
+	DRAG_START_BEFORE,
+	DRAG_START_AFTER,
+};
+
+DragContext drag;
+
 Regex* regex;
 
 #define POOL_SIZE 256
@@ -99,7 +111,6 @@ Regex* Regex_init(Regex* regex);
 NoUnionEx* NoUnionEx_init(NoUnionEx* ex);
 Unit* Unit_init(Unit* unit);
 UnitContents* UnitContents_init(UnitContents* contents);
-UnitRepetition* UnitRepetition_init(UnitRepetition* rep);
 LitChar* LitChar_init(LitChar* c);
 MetaChar* MetaChar_init(MetaChar* c);
 Special* Special_init(Special* special);
@@ -120,7 +131,10 @@ NoUnionEx* NoUnionEx_init(NoUnionEx* ex) {
 
 Unit* Unit_init(Unit* unit) {
 	unit->Contents = UnitContents_init((UnitContents*) pool_alloc(&regexEntityPool));
-	unit->Repetition = UnitRepetition_init((UnitRepetition*) pool_alloc(&regexEntityPool));
+	unit->RepeatMin = 1;
+	unit->RepeatMax = 1;
+	unit->_minbuf = 1.0f;
+	unit->_maxbuf = 1.0f;
 	return unit;
 }
 
@@ -132,12 +146,6 @@ UnitContents* UnitContents_init(UnitContents* contents) {
 	contents->Set = Set_init((Set*) pool_alloc(&regexEntityPool));
 	contents->Group = Group_init((Group*) pool_alloc(&regexEntityPool));
 	return contents;
-}
-
-UnitRepetition* UnitRepetition_init(UnitRepetition* rep) {
-	rep->Max = 0;
-	rep->_maxbuf = 0.0f;
-	return rep;
 }
 
 LitChar* LitChar_init(LitChar* c) {
@@ -281,31 +289,28 @@ void doTree_Unit(Unit* unit) {
 			mu_end_popup(ctx);
 		}
 
-		mu_checkbox(ctx, "Repeats", &unit->Repeats);
-		if (unit->Repeats) {
-			mu_layout_row(ctx, 4, (int[]) { 40, 40, 40, 40 }, 0);
+		mu_layout_row(ctx, 4, (int[]) { 40, 40, 40, 40 }, 0);
 
-			mu_label(ctx, "Min:");
-			if (unit->Repetition->_minbuf < 0) {
-				unit->Repetition->_minbuf = 0.0f;
-			}
-			mu_number_ex(ctx, &unit->Repetition->_minbuf, 0.02, "%.0f", 0);
-			unit->Repetition->Min = fround(unit->Repetition->_minbuf);
-			if (unit->Repetition->Min < 0) {
-				unit->Repetition->Min = 0;
-			}
-
-			mu_label(ctx, "Max:");
-			if (unit->Repetition->_maxbuf < 0) {
-				unit->Repetition->_maxbuf = 0.0f;
-			}
-			mu_number_ex(ctx, &unit->Repetition->_maxbuf, 0.02, "%.0f", 0);
-			unit->Repetition->Max = fround(unit->Repetition->_maxbuf);
-			if (unit->Repetition->Max < 0) {
-				unit->Repetition->Max = 0;
-			}
-			mu_layout_row(ctx, 0, NULL, 0);
+		mu_label(ctx, "Min:");
+		if (unit->_minbuf < 0) {
+			unit->_minbuf = 0.0f;
 		}
+		mu_number_ex(ctx, &unit->_minbuf, 0.02, "%.0f", 0);
+		unit->RepeatMin = fround(unit->_minbuf);
+		if (unit->RepeatMin < 0) {
+			unit->RepeatMin = 0;
+		}
+
+		mu_label(ctx, "Max:");
+		if (unit->_maxbuf < 0) {
+			unit->_maxbuf = 0.0f;
+		}
+		mu_number_ex(ctx, &unit->_maxbuf, 0.02, "%.0f", 0);
+		unit->RepeatMax = fround(unit->_maxbuf);
+		if (unit->RepeatMax < 0) {
+			unit->RepeatMax = 0;
+		}
+		mu_layout_row(ctx, 0, NULL, 0);
 
 		// Handle contents
 		switch (unit->Contents->Type) {
@@ -426,8 +431,10 @@ void doTree_Group(Group* group) {
 	mu_pop_id(ctx);
 }
 
-static const int UNION_VERTICAL_SPACING = 10;
-static const int UNIT_HORIZONTAL_SPACING = 5;
+const int UNION_VERTICAL_SPACING = 10;
+const int UNIT_HORIZONTAL_SPACING = 5;
+const int UNIT_HPAD = 16;
+const int UNIT_VPAD = 3;
 
 Vec2i computeSize_Regex(Regex* regex);
 Vec2i computeSize_NoUnionEx(NoUnionEx* ex);
@@ -470,7 +477,7 @@ Vec2i computeSize_NoUnionEx(NoUnionEx* ex) {
 
 Vec2i computeSize_Unit(Unit* unit) {
 	Vec2i contentsSize = computeSize_UnitContents(unit->Contents);
-	unit->Size = (Vec2i) { .w = contentsSize.w + 6, .h = contentsSize.h + 6 };
+	unit->Size = (Vec2i) { .w = contentsSize.w + UNIT_HPAD * 2, .h = contentsSize.h + UNIT_VPAD * 2 };
 
 	return unit->Size;
 }
@@ -538,7 +545,49 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h),
 		mu_color(200, 200, 200, 255)
 	);
-	drawRailroad_UnitContents(unit->Contents, (Vec2i) { .x = origin.x + 3, .y = origin.y + 3 });
+	drawRailroad_UnitContents(unit->Contents, (Vec2i) {
+		.x = origin.x + UNIT_HPAD,
+		.y = origin.y + UNIT_VPAD,
+	});
+
+	mu_Rect beforeHandle = mu_rect(origin.x + 6, origin.y + 10, 5, 5);
+	mu_Rect afterHandle = mu_rect(origin.x + unit->Size.w - 11, origin.y + 10, 5, 5);
+	mu_draw_rect(
+		ctx,
+		beforeHandle,
+		mu_color(100, 100, 100, 255)
+	);
+	mu_draw_rect(
+		ctx,
+		afterHandle,
+		mu_color(100, 100, 100, 255)
+	);
+
+	if (ctx->mouse_pressed == MU_MOUSE_LEFT && !drag.Unit) {
+		// start drag
+		if (mu_mouse_over(ctx, beforeHandle)) {
+			drag = (DragContext) {
+				.Unit = unit,
+				.StartedWhere = DRAG_START_BEFORE,
+			};
+		} else if (mu_mouse_over(ctx, afterHandle)) {
+			drag = (DragContext) {
+				.Unit = unit,
+				.StartedWhere = DRAG_START_AFTER,
+			};
+		}
+	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.Unit) {
+		// drag finished
+		if (unit == drag.Unit) {
+			if (mu_mouse_over(ctx, beforeHandle) && drag.StartedWhere == DRAG_START_AFTER) {
+				// after -> before, so repeat
+				Unit_SetRepeatMax(unit, 0);
+			} else if (mu_mouse_over(ctx, afterHandle) && drag.StartedWhere == DRAG_START_BEFORE) {
+				// before -> after, so skip
+				Unit_SetRepeatMin(unit, 0);
+			}
+		}
+	}
 }
 
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
@@ -601,6 +650,14 @@ void frame() {
 	if (mu_begin_window_ex(ctx, "Test", mu_rect(520, 300, 500, 500), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(regex, (Vec2i) { .x = 520, .y = 300 });
 		mu_end_window(ctx);
+	}
+
+	// reset drag
+	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
+		drag = (DragContext) {
+			.Unit = NULL,
+			.StartedWhere = 0,
+		};
 	}
 
 	mu_end(ctx);
