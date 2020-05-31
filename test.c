@@ -31,6 +31,10 @@ static int text_height(mu_Font font) {
 	return _textHeight;
 }
 
+void setTextHeight(int textHeight) {
+	_textHeight = textHeight;
+}
+
 mu_Context* ctx;
 
 void mouseMove(int x, int y) {
@@ -187,9 +191,7 @@ Group* Group_init(Group* group) {
 	return group;
 }
 
-void init(int textHeight) {
-	_textHeight = textHeight;
-
+void init() {
 	pool_init(&regexEntityPool, POOL_PARAMS(RegexType));
 	regex = Regex_init((Regex*) pool_alloc(&regexEntityPool));
 

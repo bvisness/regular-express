@@ -34,6 +34,9 @@
 		const canvas = document.querySelector('canvas');
 		const ctx = canvas.getContext('2d');
 
+		let dpr;
+		let textHeight;
+
 		async function init() {
 			const mem = new WebAssembly.Memory({
 				initial: 10,
@@ -120,30 +123,30 @@
 							ctx.restore();
 							ctx.save();
 							ctx.beginPath();
-							ctx.rect(x, y, w, h);
+							ctx.rect(x * dpr, y * dpr, w * dpr, h * dpr);
 							ctx.clip();
 						},
 						canvas_rect: (x, y, w, h, r, g, b, a) => {
 							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-							ctx.fillRect(x, y, w, h);
+							ctx.fillRect(x * dpr, y * dpr, w * dpr, h * dpr);
 						},
 						canvas_circle: (x, y, radius, r, g, b, a) => {
 							ctx.beginPath();
-							ctx.arc(x, y, radius, 0, 2 * Math.PI);
+							ctx.arc(x * dpr, y * dpr, radius * dpr, 0, 2 * Math.PI);
 							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
 							ctx.fill();
 						},
 						canvas_text: (strPtr, x, y, r, g, b, a) => {
 							const str = getString(strPtr);
 							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-							ctx.fillText(str, x, y);
+							ctx.fillText(str, x * dpr, y * dpr);
 						},
 
 						measureText: (strPtr, len) => {
 							const str = getString(strPtr, len);
 							const metrics = ctx.measureText(str);
 
-							return metrics.width;
+							return metrics.width / dpr;
 						},
 					},
 				}
@@ -226,18 +229,21 @@
 			});
 
 			function updateCanvasSize() {
-				canvas.width = window.innerWidth;
-				canvas.height = window.innerHeight;
-				ctx.textBaseline = "top";
-				ctx.font = "14px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol";
+				dpr = window.devicePixelRatio;
+				canvas.width = window.innerWidth * dpr;
+				canvas.height = window.innerHeight * dpr;
+
+				ctx.textBaseline = 'top';
+				ctx.font = `${14 * dpr}px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol`;
+				textHeight = ctx.measureText('NothinBelowTheBaseline').actualBoundingBoxDescent;
+				test.exports.setTextHeight(textHeight / dpr);
 
 				window.requestAnimationFrame(doFrame);
 			}
 			updateCanvasSize();
 			window.addEventListener('resize', () => { updateCanvasSize(); });
-
-			const textHeight = ctx.measureText('NothinBelowTheBaseline').actualBoundingBoxDescent;
-			test.exports.init(textHeight);
+			
+			test.exports.init();
 
 			function doFrame() {
 				test.exports.frame();
