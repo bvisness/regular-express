@@ -4,6 +4,8 @@
 
 #include "microui.h"
 
+#include "util/util.h"
+
 #include "regex/alloc.h"
 #include "regex/pool.h"
 #include "regex/regex.h"
@@ -69,22 +71,6 @@ void scroll(int x, int y) {
 	mu_input_scroll(ctx, x, y);
 }
 
-int imax(int a, int b) {
-	if (a > b) {
-		return a;
-	} else {
-		return b;
-	}
-}
-
-int imin(int a, int b) {
-	if (a < b) {
-		return a;
-	} else {
-		return b;
-	}
-}
-
 // --------------------------------------------------------------------
 // --------------------------------------------------------------------
 
@@ -112,84 +98,88 @@ void init() {
 }
 
 const int UNION_VERTICAL_SPACING = 10;
-const int UNIT_HORIZONTAL_SPACING = 5;
-const int UNIT_HPAD = 16;
-const int UNIT_VPAD = 3;
 
-Vec2i computeSize_Regex(Regex* regex);
-Vec2i computeSize_NoUnionEx(NoUnionEx* ex);
-Vec2i computeSize_Unit(Unit* unit);
-Vec2i computeSize_UnitContents(UnitContents* contents);
-Vec2i computeSize_Group(Group* group);
+void prepass_Regex(Regex* regex);
+void prepass_NoUnionEx(NoUnionEx* ex);
+void prepass_Unit(Unit* unit);
+void prepass_UnitContents(UnitContents* contents);
+void prepass_Group(Group* group);
 
-Vec2i computeSize_Regex(Regex* regex) {
+void prepass_Regex(Regex* regex) {
 	int w = 0;
 	int h = 0;
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
-		Vec2i memberSize = computeSize_NoUnionEx(member);
+		prepass_NoUnionEx(member);
 
-		w = imax(w, memberSize.w);
-		h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + memberSize.h;
+		w = imax(w, member->Size.w);
+		h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + member->Size.h;
 	}
 
 	regex->Size = (Vec2i) { .w = w, .h = h };
-
-	return regex->Size;
 }
 
-Vec2i computeSize_NoUnionEx(NoUnionEx* ex) {
+void prepass_NoUnionEx(NoUnionEx* ex) {
 	int w = 0;
 	int h = 0;
 
 	for (int j = 0; j < ex->NumUnits; j++) {
 		Unit* unit = ex->Units[j];
-		Vec2i unitSize = computeSize_Unit(unit);
+		prepass_Unit(unit);
 
-		w += (j != 0 ? UNIT_HORIZONTAL_SPACING : 0) + unitSize.w;
-		h = imax(h, unitSize.h);
+		w += unit->Size.w;
+		h = imax(h, unit->Size.h);
+
+		unit->Previous = (j == 0) ? NULL : ex->Units[j-1];
+		unit->Next = (j == ex->NumUnits - 1) ? NULL : ex->Units[j+1];
 	}
 
 	ex->Size = (Vec2i) { .w = w, .h = h };
-
-	return ex->Size;
 }
 
-Vec2i computeSize_Unit(Unit* unit) {
-	Vec2i contentsSize = computeSize_UnitContents(unit->Contents);
-	unit->Size = (Vec2i) { .w = contentsSize.w + UNIT_HPAD * 2, .h = contentsSize.h + UNIT_VPAD * 2 };
+void prepass_Unit(Unit* unit) {
+	UnitContents* contents = unit->Contents;
+	prepass_UnitContents(contents);
 
-	return unit->Size;
+	unit->Size = (Vec2i) {
+		.w = unit->LeftSpacing + contents->Size.w + unit->RightSpacing,
+		.h = contents->Size.h,
+	};
 }
 
-Vec2i computeSize_UnitContents(UnitContents* contents) {
+void prepass_UnitContents(UnitContents* contents) {
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
-			contents->Size = (Vec2i) { .w = 20, .h = 20 };
+			contents->Size = (Vec2i) { .w = 15, .h = 20 };
 		} break;
 		case RE_CONTENTS_METACHAR: {
-			contents->Size = (Vec2i) { .w = 20, .h = 20 };
+			contents->Size = (Vec2i) { .w = 15, .h = 20 };
 		} break;
 		case RE_CONTENTS_SPECIAL: {
-			contents->Size = (Vec2i) { .w = 20, .h = 20 };
+			contents->Size = (Vec2i) { .w = 15, .h = 20 };
 		} break;
 		case RE_CONTENTS_SET: {
 			contents->Size = (Vec2i) { .w = 80, .h = 20 };
 		} break;
 		case RE_CONTENTS_GROUP: {
-			Vec2i groupSize = computeSize_Group(contents->Group);
-			contents->Size = (Vec2i) { .w = groupSize.w + 20, .h = groupSize.h + 20 };
+			Group* group = contents->Group;
+			prepass_Group(group);
+			contents->Size = (Vec2i) {
+				.w = group->Size.w + 20,
+				.h = group->Size.h + 20,
+			};
 		}
 	}
-
-	return contents->Size;
 }
 
-Vec2i computeSize_Group(Group* group) {
-	Vec2i regexSize = computeSize_Regex(group->Regex);
-	group->Size = (Vec2i) { .w = regexSize.w + 10, .h = regexSize.h + 10};
+void prepass_Group(Group* group) {
+	Regex* regex = group->Regex;
+	prepass_Regex(regex);
 
-	return group->Size;
+	group->Size = (Vec2i) {
+		.w = regex->Size.w + 10,
+		.h = regex->Size.h + 10,
+	};
 }
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin);
@@ -215,59 +205,59 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin) {
 		Unit* unit = ex->Units[i];
 		drawRailroad_Unit(unit, unitOrigin);
 
-		unitOrigin.x += UNIT_HORIZONTAL_SPACING + unit->Size.w;
+		unitOrigin.x += unit->Size.w;
 	}
 }
 
 void drawRailroad_Unit(Unit* unit, Vec2i origin) {
+	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
+	int isHover = mu_mouse_over(ctx, rect);
+	unit->LastRect = rect;
+	unit->IsHover = isHover;
+
 	mu_draw_rect(
 		ctx,
-		mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h),
+		rect,
 		mu_color(200, 200, 200, 255)
 	);
 	drawRailroad_UnitContents(unit->Contents, (Vec2i) {
-		.x = origin.x + UNIT_HPAD,
-		.y = origin.y + UNIT_VPAD,
+		.x = unit->LeftSpacing + origin.x,
+		.y = origin.y,
 	});
 
-	mu_Rect beforeHandle = mu_rect(origin.x + 6, origin.y + 10, 5, 5);
-	mu_Rect afterHandle = mu_rect(origin.x + unit->Size.w - 11, origin.y + 10, 5, 5);
-	mu_draw_rect(
-		ctx,
-		beforeHandle,
-		mu_color(100, 100, 100, 255)
-	);
-	mu_draw_rect(
-		ctx,
-		afterHandle,
-		mu_color(100, 100, 100, 255)
-	);
+	int targetWireSpacing = isHover ? 20 : 0;
 
-	if (ctx->mouse_pressed == MU_MOUSE_LEFT && !drag.Unit) {
-		// start drag
-		if (mu_mouse_over(ctx, beforeHandle)) {
-			drag = (DragContext) {
-				.Unit = unit,
-				.StartedWhere = DRAG_START_BEFORE,
-			};
-		} else if (mu_mouse_over(ctx, afterHandle)) {
-			drag = (DragContext) {
-				.Unit = unit,
-				.StartedWhere = DRAG_START_AFTER,
-			};
-		}
-	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.Unit) {
-		// drag finished
-		if (unit == drag.Unit) {
-			if (mu_mouse_over(ctx, beforeHandle) && drag.StartedWhere == DRAG_START_AFTER) {
-				// after -> before, so repeat
-				Unit_SetRepeatMax(unit, 0);
-			} else if (mu_mouse_over(ctx, afterHandle) && drag.StartedWhere == DRAG_START_BEFORE) {
-				// before -> after, so skip
-				Unit_SetRepeatMin(unit, 0);
-			}
-		}
-	}
+	int animating = 0;
+	unit->LeftSpacing = interp_linear(ctx->dt, unit->LeftSpacing, targetWireSpacing, 160, &animating);
+	ctx->animating |= animating;
+	unit->RightSpacing = interp_linear(ctx->dt, unit->RightSpacing, targetWireSpacing, 160, &animating);
+	ctx->animating |= animating;
+
+	// if (ctx->mouse_pressed == MU_MOUSE_LEFT && !drag.Unit) {
+	// 	// start drag
+	// 	if (mu_mouse_over(ctx, beforeHandle)) {
+	// 		drag = (DragContext) {
+	// 			.Unit = unit,
+	// 			.StartedWhere = DRAG_START_BEFORE,
+	// 		};
+	// 	} else if (mu_mouse_over(ctx, afterHandle)) {
+	// 		drag = (DragContext) {
+	// 			.Unit = unit,
+	// 			.StartedWhere = DRAG_START_AFTER,
+	// 		};
+	// 	}
+	// } else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.Unit) {
+	// 	// drag finished
+	// 	if (unit == drag.Unit) {
+	// 		if (mu_mouse_over(ctx, beforeHandle) && drag.StartedWhere == DRAG_START_AFTER) {
+	// 			// after -> before, so repeat
+	// 			Unit_SetRepeatMax(unit, 0);
+	// 		} else if (mu_mouse_over(ctx, afterHandle) && drag.StartedWhere == DRAG_START_BEFORE) {
+	// 			// before -> after, so skip
+	// 			Unit_SetRepeatMin(unit, 0);
+	// 		}
+	// 	}
+	// }
 }
 
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
@@ -310,8 +300,8 @@ void drawRailroad_Group(Group* group, Vec2i origin) {
 	drawRailroad_Regex(group->Regex, (Vec2i) { .x = origin.x + 5, .y = origin.y + 5 });
 }
 
-void frame() {
-	mu_begin(ctx);
+int frame(float dt) {
+	mu_begin(ctx, dt);
 
 	if (mu_begin_window(ctx, "Tree View", mu_rect(10, 10, 500, 800))) {
 		doTree(ctx, regex);
@@ -326,7 +316,7 @@ void frame() {
 		mu_end_window(ctx);
 	}
 
-	computeSize_Regex(regex);
+	prepass_Regex(regex);
 	if (mu_begin_window_ex(ctx, "Test", mu_rect(520, 300, 500, 500), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(regex, (Vec2i) { .x = 520, .y = 300 });
 		mu_end_window(ctx);
@@ -371,4 +361,6 @@ void frame() {
 			}
 		}
     }
+
+    return ctx->animating;
 }

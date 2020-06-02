@@ -242,11 +242,23 @@
 			}
 			updateCanvasSize();
 			window.addEventListener('resize', () => { updateCanvasSize(); });
-			
+
 			test.exports.init();
 
+			// TODO: The timer should probably have a cap or otherwise
+			// keep ticking in some other way. We have weird issues where
+			// the first mouse move after a while fast forwards time
+			// by a lot.
+			let lastTime = new Date().getTime() / 1000;
 			function doFrame() {
-				test.exports.frame();
+				const currentTime = new Date().getTime() / 1000;
+				const animating = test.exports.frame(currentTime - lastTime);
+
+				lastTime = currentTime;
+
+				if (animating) {
+					window.requestAnimationFrame(doFrame);
+				}
 			}
 			window.requestAnimationFrame(doFrame);
 		}

@@ -6,6 +6,8 @@
 
 #include "vec.h"
 
+#include "../microui.h"
+
 #define MAX_UNION_MEMBERS 256
 #define MAX_UNITS 256
 #define MAX_SET_ITEMS 256
@@ -56,7 +58,16 @@ typedef struct Unit {
     float _minbuf;
     float _maxbuf;
 
+    // UI/layout info
     Vec2i Size;
+    mu_Rect LastRect;
+    int IsHover;
+
+    struct Unit* Previous;
+    struct Unit* Next;
+
+    float LeftSpacing;
+    float RightSpacing;
 } Unit;
 
 void Unit_SetRepeatMin(Unit* unit, int val);
