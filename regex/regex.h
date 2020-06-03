@@ -61,8 +61,8 @@ typedef struct Unit {
     // UI/layout info
     Vec2i Size;
     mu_Rect LastRect;
-    int IsHover;
 
+    struct NoUnionEx* Parent;
     struct Unit* Previous;
     struct Unit* Next;
 
