@@ -119,7 +119,10 @@ typedef struct {
     mu_Vec2 xy;
   };
 
-  int w, h;
+  union {
+    struct { int w, h; };
+    mu_Vec2 wh;
+  };
 } mu_Rect;
 typedef struct { unsigned char r, g, b, a; } mu_Color;
 typedef struct { mu_Id id; int last_update; } mu_PoolItem;

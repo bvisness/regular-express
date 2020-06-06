@@ -40,6 +40,8 @@ struct Regex {
     struct NoUnionEx* UnionMembers[MAX_UNION_MEMBERS];
 
     Vec2i Size;
+    Vec2i UnionSize;
+    int WireHeight;
 };
 
 typedef struct NoUnionEx {
@@ -47,6 +49,7 @@ typedef struct NoUnionEx {
     struct Unit* Units[MAX_UNITS];
 
     Vec2i Size;
+    int WireHeight;
 } NoUnionEx;
 
 typedef struct Unit {
@@ -60,6 +63,7 @@ typedef struct Unit {
 
     // UI/layout info
     Vec2i Size;
+    int WireHeight;
     mu_Rect LastRect;
 
     struct NoUnionEx* Parent;
@@ -75,6 +79,8 @@ typedef struct Unit {
 
 void Unit_SetRepeatMin(Unit* unit, int val);
 void Unit_SetRepeatMax(Unit* unit, int val);
+int Unit_IsNonSingular(Unit* unit);
+int Unit_IsSkip(Unit* unit);
 int Unit_IsRepeat(Unit* unit);
 int Unit_ShouldShowWires(Unit* unit);
 int Unit_ShouldShowLeftHandle(Unit* unit);
@@ -90,6 +96,7 @@ typedef struct UnitContents {
     struct Group* Group;
 
     Vec2i Size;
+    int WireHeight;
 } UnitContents;
 
 typedef struct Group {
@@ -97,6 +104,7 @@ typedef struct Group {
     // more properties eventually, like names
 
     Vec2i Size;
+    int WireHeight;
 } Group;
 
 typedef struct Set {

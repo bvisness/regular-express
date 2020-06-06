@@ -10,12 +10,20 @@ void Unit_SetRepeatMax(Unit* unit, int val) {
     unit->_maxbuf = (float) val;
 }
 
+int Unit_IsNonSingular(Unit* unit) {
+    return Unit_IsSkip(unit) || Unit_IsRepeat(unit);
+}
+
+int Unit_IsSkip(Unit* unit) {
+    return unit->RepeatMin < 1;
+}
+
 int Unit_IsRepeat(Unit* unit) {
-    return unit->RepeatMin < 1 || unit->RepeatMax != 1;
+    return unit->RepeatMax != 1;
 }
 
 int Unit_ShouldShowWires(Unit* unit) {
-    return unit->IsHover || unit->IsDragOrigin || Unit_IsRepeat(unit);
+    return unit->IsHover || unit->IsDragOrigin || Unit_IsNonSingular(unit);
 }
 
 int Unit_ShouldShowHandles(Unit* unit) {

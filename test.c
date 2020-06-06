@@ -100,7 +100,8 @@ void init() {
   	ctx->text_height = text_height;
 }
 
-const int UNION_VERTICAL_SPACING = 10;
+const int UNION_VERTICAL_SPACING = 0;
+const int UNION_GUTTER_WIDTH = 16;
 const int UNIT_HANDLE_ZONE_WIDTH = 16;
 const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 12;
 const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
@@ -108,6 +109,7 @@ const int UNIT_REPEAT_WIRE_MARGIN = 5;
 const int UNIT_REPEAT_WIRE_SCOOT = 2;
 const int UNIT_CONTENTS_MIN_HEIGHT = 20;
 const int WIRE_THICKNESS = 2;
+const int GROUP_VERTICAL_PADDING = 8;
 
 const mu_Color COLOR_RE_TEXT = (mu_Color) { 0, 0, 0, 255 };
 const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
@@ -121,20 +123,35 @@ void prepass_Group(Group* group);
 void prepass_Regex(Regex* regex) {
 	int w = 0;
 	int h = 0;
+	int wireHeight = 0;
+
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
 		prepass_NoUnionEx(member);
 
 		w = imax(w, member->Size.w);
 		h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + member->Size.h;
+
+		if (i == 0) {
+			wireHeight = member->WireHeight;
+		}
 	}
 
-	regex->Size = (Vec2i) { .w = w, .h = h };
+	regex->UnionSize = (Vec2i) {
+		.w = w,
+		.h = h,
+	};
+	regex->Size = (Vec2i) {
+		.w = UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH,
+		.h = regex->UnionSize.h,
+	};
+	regex->WireHeight = wireHeight;
 }
 
 void prepass_NoUnionEx(NoUnionEx* ex) {
 	int w = 0;
 	int h = 0;
+	int wireHeight = 0;
 
 	for (int j = 0; j < ex->NumUnits; j++) {
 		Unit* unit = ex->Units[j];
@@ -142,6 +159,7 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 
 		w += unit->Size.w;
 		h = imax(h, unit->Size.h);
+		wireHeight = imax(wireHeight, unit->WireHeight);
 
 		unit->Parent = ex;
 		unit->Previous = (j == 0) ? NULL : ex->Units[j-1];
@@ -149,13 +167,14 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 	}
 
 	ex->Size = (Vec2i) { .w = w, .h = h };
+	ex->WireHeight = wireHeight;
 }
 
 void prepass_Unit(Unit* unit) {
 	UnitContents* contents = unit->Contents;
 	prepass_UnitContents(contents);
 
-	int attachmentWidth = Unit_IsRepeat(unit) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0;
+	int attachmentWidth = Unit_IsNonSingular(unit) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0;
 
 	unit->Size = (Vec2i) {
 		.w = unit->LeftHandleZoneWidth
@@ -165,29 +184,32 @@ void prepass_Unit(Unit* unit) {
 			+ unit->RightHandleZoneWidth,
 		.h = UNIT_REPEAT_WIRE_ZONE_HEIGHT + contents->Size.h + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
 	};
+	unit->WireHeight = UNIT_REPEAT_WIRE_ZONE_HEIGHT + contents->WireHeight;
 }
 
 void prepass_UnitContents(UnitContents* contents) {
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
 			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_METACHAR: {
-			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			contents->Size = (Vec2i) { .w = 25, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_SPECIAL: {
 			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_SET: {
 			contents->Size = (Vec2i) { .w = 80, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_GROUP: {
 			Group* group = contents->Group;
 			prepass_Group(group);
-			contents->Size = (Vec2i) {
-				.w = group->Size.w + 20,
-				.h = group->Size.h + 20,
-			};
+			contents->Size = group->Size;
+			contents->WireHeight = group->WireHeight;
 		}
 	}
 }
@@ -198,8 +220,9 @@ void prepass_Group(Group* group) {
 
 	group->Size = (Vec2i) {
 		.w = regex->Size.w,
-		.h = regex->Size.h,
+		.h = GROUP_VERTICAL_PADDING + regex->Size.h + GROUP_VERTICAL_PADDING,
 	};
+	group->WireHeight = GROUP_VERTICAL_PADDING + regex->WireHeight;
 }
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin);
@@ -209,23 +232,103 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin);
 void drawRailroad_Group(Group* group, Vec2i origin);
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin) {
-	Vec2i memberOrigin = origin;
+	Vec2i memberOrigin = (Vec2i) {
+		.x = origin.x + UNION_GUTTER_WIDTH,
+		.y = origin.y,
+	};
 
+	// TODO: What if the union is empty?
+
+	int wireY = origin.y + regex->WireHeight - WIRE_THICKNESS/2;
+
+	// entry/exit wires (half gutter width)
+	mu_draw_rect(
+		ctx,
+		mu_rect(
+			origin.x,
+			wireY,
+			UNION_GUTTER_WIDTH/2,
+			WIRE_THICKNESS
+		),
+		COLOR_WIRE
+	);
+	mu_draw_rect(
+		ctx,
+		mu_rect(
+			origin.x + UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH/2,
+			wireY,
+			UNION_GUTTER_WIDTH/2,
+			WIRE_THICKNESS
+		),
+		COLOR_WIRE
+	);
+
+	int finalMemberWireY = wireY;
+
+	// union members
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
 		drawRailroad_NoUnionEx(member, memberOrigin);
 
+		int memberWireY = memberOrigin.y + member->WireHeight - WIRE_THICKNESS/2;
+		mu_draw_rect(
+			ctx,
+			mu_rect(
+				origin.x + UNION_GUTTER_WIDTH/2,
+				memberWireY,
+				UNION_GUTTER_WIDTH/2,
+				WIRE_THICKNESS
+			),
+			COLOR_WIRE
+		);
+		mu_draw_rect(
+			ctx,
+			mu_rect(
+				origin.x + UNION_GUTTER_WIDTH + member->Size.w,
+				memberWireY,
+				regex->UnionSize.w - member->Size.w + UNION_GUTTER_WIDTH/2,
+				WIRE_THICKNESS
+			),
+			COLOR_WIRE
+		);
+
+		finalMemberWireY = memberWireY;
 		memberOrigin.y += UNION_VERTICAL_SPACING + member->Size.h;
 	}
+
+	// vertical connecting wires
+	mu_draw_rect(
+		ctx,
+		mu_rect(
+			origin.x + UNION_GUTTER_WIDTH/2 - WIRE_THICKNESS/2,
+			wireY,
+			WIRE_THICKNESS,
+			finalMemberWireY - wireY + WIRE_THICKNESS
+		),
+		COLOR_WIRE
+	);
+	mu_draw_rect(
+		ctx,
+		mu_rect(
+			origin.x + UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH/2 - WIRE_THICKNESS/2,
+			wireY,
+			WIRE_THICKNESS,
+			finalMemberWireY - wireY + WIRE_THICKNESS
+		),
+		COLOR_WIRE
+	);
 }
 
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin) {
-	Vec2i unitOrigin = origin;
+	int unitX = origin.x;
 	for (int i = 0; i < ex->NumUnits; i++) {
 		Unit* unit = ex->Units[i];
-		drawRailroad_Unit(unit, unitOrigin);
+		drawRailroad_Unit(unit, (Vec2i) {
+			.x = unitX,
+			.y = origin.y + ex->WireHeight - unit->WireHeight,
+		});
 
-		unitOrigin.x += unit->Size.w;
+		unitX += unit->Size.w;
 	}
 }
 
@@ -233,7 +336,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
 	int isHover = mu_mouse_over(ctx, rect);
 	int isDragOrigin = (drag.OriginUnit == unit);
-	int isRepeat = Unit_IsRepeat(unit);
+	int nonSingular = Unit_IsNonSingular(unit);
 
 	// save some of 'em for the next pass
 	unit->LastRect = rect;
@@ -242,7 +345,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 
 	mu_push_clip_rect(ctx, rect);
 
-	int middleY = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT + UNIT_CONTENTS_MIN_HEIGHT/2;
+	int middleY = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT + unit->Contents->WireHeight;
 
 	// thru-wires
 	mu_draw_rect(
@@ -250,7 +353,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		mu_rect(
 			origin.x,
 			middleY - WIRE_THICKNESS/2,
-			unit->LeftHandleZoneWidth + (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+			unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
 			WIRE_THICKNESS
 		),
 		COLOR_WIRE
@@ -260,10 +363,10 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		mu_rect(
 			origin.x
 				+ unit->LeftHandleZoneWidth
-				+ (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
+				+ (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
 				+ unit->Contents->Size.x,
 			middleY - WIRE_THICKNESS/2,
-			(isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0) + unit->RightHandleZoneWidth,
+			(nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0) + unit->RightHandleZoneWidth,
 			WIRE_THICKNESS
 		),
 		COLOR_WIRE
@@ -286,9 +389,9 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 	if (Unit_ShouldShowRightHandle(unit)) {
 		int handleX = origin.x
 			+ unit->LeftHandleZoneWidth
-			+ (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
+			+ (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
 			+ unit->Contents->Size.x
-			+ (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
+			+ (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
 			+ unit->RightHandleZoneWidth/2
 			- HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
@@ -307,27 +410,29 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2
 		- WIRE_THICKNESS/2;
 
+	int scoot = (Unit_IsSkip(unit) && Unit_IsRepeat(unit) ? UNIT_REPEAT_WIRE_SCOOT : 0);
+
 	if (unit->RepeatMin < 1) {
 		// draw the skip wire
 		int skipWireY = middleY
-			- UNIT_CONTENTS_MIN_HEIGHT/2
+			- unit->Contents->WireHeight
 			- UNIT_REPEAT_WIRE_MARGIN
-			- UNIT_REPEAT_WIRE_SCOOT
+			- scoot
 			- WIRE_THICKNESS;
 
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX - UNIT_REPEAT_WIRE_SCOOT, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
+			mu_rect(leftWireX - scoot, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(rightWireX + UNIT_REPEAT_WIRE_SCOOT, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
+			mu_rect(rightWireX + scoot, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX - UNIT_REPEAT_WIRE_SCOOT, skipWireY, rightWireX - leftWireX + UNIT_REPEAT_WIRE_SCOOT*2 + WIRE_THICKNESS, WIRE_THICKNESS),
+			mu_rect(leftWireX - scoot, skipWireY, rightWireX - leftWireX + scoot*2 + WIRE_THICKNESS, WIRE_THICKNESS),
 			COLOR_WIRE
 		);
 	}
@@ -335,30 +440,30 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 	if (unit->RepeatMax != 1) {
 		// draw the repeat wire
 		int repeatWireY = middleY
-			- UNIT_CONTENTS_MIN_HEIGHT/2
+			- unit->Contents->WireHeight
 			+ unit->Contents->Size.y
 			+ UNIT_REPEAT_WIRE_MARGIN
-			- UNIT_REPEAT_WIRE_SCOOT;
+			- scoot;
 
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX + UNIT_REPEAT_WIRE_SCOOT, middleY, WIRE_THICKNESS, repeatWireY - middleY),
+			mu_rect(leftWireX + scoot, middleY, WIRE_THICKNESS, repeatWireY - middleY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(rightWireX - UNIT_REPEAT_WIRE_SCOOT, middleY, WIRE_THICKNESS, repeatWireY - middleY),
+			mu_rect(rightWireX - scoot, middleY, WIRE_THICKNESS, repeatWireY - middleY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX + UNIT_REPEAT_WIRE_SCOOT, repeatWireY, rightWireX - leftWireX - UNIT_REPEAT_WIRE_SCOOT*2 + WIRE_THICKNESS, WIRE_THICKNESS),
+			mu_rect(leftWireX + scoot, repeatWireY, rightWireX - leftWireX - scoot*2 + WIRE_THICKNESS, WIRE_THICKNESS),
 			COLOR_WIRE
 		);
 	}
 
 	drawRailroad_UnitContents(unit->Contents, (Vec2i) {
-		.x = origin.x + unit->LeftHandleZoneWidth + (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+		.x = origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
 		.y = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
 	});
 
@@ -502,39 +607,63 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
 	mu_Rect r = mu_rect(origin.x, origin.y, contents->Size.w, contents->Size.h);
 
-	mu_draw_rect(
-		ctx,
-		r,
-		mu_color(0, 0, 0, 50)
-	);
-
 	mu_layout_set_next(ctx, r, 0);
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
+			mu_draw_rect(
+				ctx,
+				r,
+				mu_color(200, 200, 200, 255)
+			);
+
 			char* str = contents->LitChar->_buf;
 			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_METACHAR: {
+			mu_draw_rect(
+				ctx,
+				r,
+				mu_color(200, 200, 200, 255)
+			);
+
 			char* str = &contents->MetaChar->_backslash;
 			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_SPECIAL: {
 			// TODO: DO IT
+			mu_draw_rect(
+				ctx,
+				r,
+				mu_color(200, 200, 200, 255)
+			);
 		} break;
 		case RE_CONTENTS_SET: {
 			// TODO: Set
+			mu_draw_rect(
+				ctx,
+				r,
+				mu_color(200, 200, 200, 255)
+			);
 		} break;
 		case RE_CONTENTS_GROUP: {
-			// TODO: Change the origin?
-			drawRailroad_Group(contents->Group, (Vec2i) { .x = origin.x + 10, .y = origin.y + 10 });
+			drawRailroad_Group(contents->Group, origin);
 		} break;
 	}
 }
 
 void drawRailroad_Group(Group* group, Vec2i origin) {
-	drawRailroad_Regex(group->Regex, (Vec2i) { .x = origin.x, .y = origin.y });
+	mu_draw_rect(
+		ctx,
+		mu_rect(origin.x, origin.y, group->Size.w, group->Size.h),
+		mu_color(0, 0, 0, 25)
+	);
+
+	drawRailroad_Regex(group->Regex, (Vec2i) {
+		.x = origin.x,
+		.y = GROUP_VERTICAL_PADDING + origin.y,
+	});
 }
 
 int frame(float dt) {
