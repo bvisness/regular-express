@@ -102,6 +102,7 @@ void init() {
 
 const int UNION_VERTICAL_SPACING = 0;
 const int UNION_GUTTER_WIDTH = 16;
+const int NOUNIONEX_MIN_HEIGHT = 20;
 const int UNIT_HANDLE_ZONE_WIDTH = 16;
 const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 12;
 const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
@@ -109,7 +110,7 @@ const int UNIT_REPEAT_WIRE_MARGIN = 5;
 const int UNIT_REPEAT_WIRE_SCOOT = 2;
 const int UNIT_CONTENTS_MIN_HEIGHT = 20;
 const int WIRE_THICKNESS = 2;
-const int GROUP_VERTICAL_PADDING = 8;
+const int GROUP_VERTICAL_PADDING = 0;
 
 const mu_Color COLOR_RE_TEXT = (mu_Color) { 0, 0, 0, 255 };
 const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
@@ -150,8 +151,8 @@ void prepass_Regex(Regex* regex) {
 
 void prepass_NoUnionEx(NoUnionEx* ex) {
 	int w = 0;
-	int h = 0;
-	int wireHeight = 0;
+	int h = NOUNIONEX_MIN_HEIGHT;
+	int wireHeight = NOUNIONEX_MIN_HEIGHT/2;
 
 	for (int j = 0; j < ex->NumUnits; j++) {
 		Unit* unit = ex->Units[j];
