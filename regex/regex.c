@@ -10,6 +10,25 @@ void Unit_SetRepeatMax(Unit* unit, int val) {
     unit->_maxbuf = (float) val;
 }
 
+int Unit_IsRepeat(Unit* unit) {
+    return unit->RepeatMin < 1 || unit->RepeatMax != 1;
+}
+
+int Unit_ShouldShowWires(Unit* unit) {
+    return unit->IsHover || unit->IsDragOrigin || Unit_IsRepeat(unit);
+}
+
+int Unit_ShouldShowLeftHandle(Unit* unit) {
+    return Unit_ShouldShowWires(unit) && !unit->Previous;
+}
+
+int Unit_ShouldShowRightHandle(Unit* unit) {
+    return (
+        Unit_ShouldShowWires(unit)
+        || (unit->Next && Unit_ShouldShowWires(unit->Next))
+    );
+}
+
 char* toString_Regex(char* base, Regex* regex);
 char* toString_NoUnionEx(char* base, NoUnionEx* ex);
 char* toString_Unit(char* base, Unit* unit);

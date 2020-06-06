@@ -66,12 +66,19 @@ typedef struct Unit {
     struct Unit* Previous;
     struct Unit* Next;
 
-    float LeftSpacing;
-    float RightSpacing;
+    int IsHover;
+    int IsDragOrigin;
+
+    float LeftHandleZoneWidth;
+    float RightHandleZoneWidth;
 } Unit;
 
 void Unit_SetRepeatMin(Unit* unit, int val);
 void Unit_SetRepeatMax(Unit* unit, int val);
+int Unit_IsRepeat(Unit* unit);
+int Unit_ShouldShowWires(Unit* unit);
+int Unit_ShouldShowLeftHandle(Unit* unit);
+int Unit_ShouldShowRightHandle(Unit* unit);
 
 typedef struct UnitContents {
     int Type;

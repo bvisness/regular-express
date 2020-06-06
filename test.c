@@ -77,8 +77,8 @@ void scroll(int x, int y) {
 typedef struct DragContext {
 	Unit* OriginUnit;
 
-	Unit* HandleBeforeUnit;
-	Unit* HandleAfterUnit;
+	Unit* UnitBeforeHandle;
+	Unit* UnitAfterHandle;
 } DragContext;
 
 DragContext drag;
@@ -95,6 +95,13 @@ void init() {
 }
 
 const int UNION_VERTICAL_SPACING = 10;
+const int UNIT_HANDLE_ZONE_WIDTH = 16;
+const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 12;
+const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
+const int UNIT_REPEAT_WIRE_MARGIN = 5;
+const int UNIT_CONTENTS_MIN_HEIGHT = 20;
+const int WIRE_THICKNESS = 2;
+
 const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
 
 void prepass_Regex(Regex* regex);
@@ -140,25 +147,31 @@ void prepass_Unit(Unit* unit) {
 	UnitContents* contents = unit->Contents;
 	prepass_UnitContents(contents);
 
+	int attachmentWidth = Unit_IsRepeat(unit) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0;
+
 	unit->Size = (Vec2i) {
-		.w = unit->LeftSpacing + contents->Size.w + unit->RightSpacing,
-		.h = contents->Size.h,
+		.w = unit->LeftHandleZoneWidth
+			+ attachmentWidth
+			+ contents->Size.w
+			+ attachmentWidth
+			+ unit->RightHandleZoneWidth,
+		.h = UNIT_REPEAT_WIRE_ZONE_HEIGHT + contents->Size.h + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
 	};
 }
 
 void prepass_UnitContents(UnitContents* contents) {
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
-			contents->Size = (Vec2i) { .w = 15, .h = 20 };
+			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
 		} break;
 		case RE_CONTENTS_METACHAR: {
-			contents->Size = (Vec2i) { .w = 15, .h = 20 };
+			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
 		} break;
 		case RE_CONTENTS_SPECIAL: {
-			contents->Size = (Vec2i) { .w = 15, .h = 20 };
+			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
 		} break;
 		case RE_CONTENTS_SET: {
-			contents->Size = (Vec2i) { .w = 80, .h = 20 };
+			contents->Size = (Vec2i) { .w = 80, .h = UNIT_CONTENTS_MIN_HEIGHT };
 		} break;
 		case RE_CONTENTS_GROUP: {
 			Group* group = contents->Group;
@@ -211,163 +224,198 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin) {
 void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
 	int isHover = mu_mouse_over(ctx, rect);
+	int isDragOrigin = (drag.OriginUnit == unit);
+	int isRepeat = Unit_IsRepeat(unit);
+
+	// save some of 'em for the next pass
 	unit->LastRect = rect;
+	unit->IsHover = isHover;
+	unit->IsDragOrigin = isDragOrigin;
 
 	mu_push_clip_rect(ctx, rect);
 
 	// unit itself
-	mu_draw_rect(
-		ctx,
-		rect,
-		mu_color(200, 200, 200, 255)
-	);
+	mu_draw_rect(ctx, rect, mu_color(200, 200, 200, 255));
 
-	int wireY = origin.y + 9;
+	int middleY = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT + UNIT_CONTENTS_MIN_HEIGHT/2;
 
-	// left wire
+	// thru-wire
 	mu_draw_rect(
 		ctx,
-		mu_rect(origin.x, wireY, unit->LeftSpacing, 2),
-		COLOR_WIRE
-	);
-	// right wire
-	mu_draw_rect(
-		ctx,
-		mu_rect(origin.x + unit->LeftSpacing + unit->Contents->Size.x, wireY, unit->LeftSpacing, 2),
+		mu_rect(origin.x, middleY - WIRE_THICKNESS/2, unit->Size.x, WIRE_THICKNESS),
 		COLOR_WIRE
 	);
 
 	const int HANDLE_SIZE = 8;
-	int handleY = origin.y + 6;
+	int handleY = middleY - HANDLE_SIZE/2;
 
-	mu_Rect leftHandleRect;
-	mu_Rect rightHandleRect;
+	int overLeftHandle = 0;
+	int overRightHandle = 0;
 
 	// left handle
-	{
-		int wireWidth = (unit->Previous != NULL ? unit->Previous->RightSpacing : 0) + unit->LeftSpacing;
-		int handleX = origin.x + wireWidth/2 - HANDLE_SIZE/2;
-		leftHandleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
+	if (Unit_ShouldShowLeftHandle(unit)) {
+		int handleX = origin.x + unit->LeftHandleZoneWidth/2 - HANDLE_SIZE/2;
+		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
+		mu_draw_rect(ctx, handleRect, COLOR_WIRE);
+		overLeftHandle = mu_mouse_over(ctx, handleRect);
+	}
+	// right handle
+	if (Unit_ShouldShowRightHandle(unit)) {
+		int handleX = origin.x
+			+ unit->LeftHandleZoneWidth
+			+ (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
+			+ unit->Contents->Size.x
+			+ (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
+			+ unit->RightHandleZoneWidth/2
+			- HANDLE_SIZE/2;
+		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
+		mu_draw_rect(ctx, handleRect, COLOR_WIRE);
+		overRightHandle = mu_mouse_over(ctx, handleRect);
+	}
+
+	int leftWireX = origin.x
+		+ unit->LeftHandleZoneWidth
+		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2
+		- WIRE_THICKNESS/2;
+	int rightWireX = origin.x
+		+ unit->LeftHandleZoneWidth
+		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH
+		+ unit->Contents->Size.x
+		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2
+		- WIRE_THICKNESS/2;
+
+	if (unit->RepeatMin < 1) {
+		// draw the skip wire
+		int skipWireY = middleY
+			- UNIT_CONTENTS_MIN_HEIGHT/2
+			- UNIT_REPEAT_WIRE_MARGIN
+			- WIRE_THICKNESS;
+
 		mu_draw_rect(
 			ctx,
-			leftHandleRect,
+			mu_rect(leftWireX, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
+			COLOR_WIRE
+		);
+		mu_draw_rect(
+			ctx,
+			mu_rect(rightWireX, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
+			COLOR_WIRE
+		);
+		mu_draw_rect(
+			ctx,
+			mu_rect(leftWireX, skipWireY, rightWireX - leftWireX + WIRE_THICKNESS, WIRE_THICKNESS),
 			COLOR_WIRE
 		);
 	}
-	// right handle
-	{
-		int wireWidth = unit->LeftSpacing + (unit->Next != NULL ? unit->Next->LeftSpacing : 0);
-		int handleX = origin.x
-			+ unit->LeftSpacing
-			+ unit->Contents->Size.x
-			+ wireWidth/2
-			- HANDLE_SIZE/2;
-		rightHandleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
+
+	if (unit->RepeatMax != 1) {
+		// draw the repeat wire
+		int repeatWireY = middleY - UNIT_CONTENTS_MIN_HEIGHT/2 + unit->Contents->Size.y + UNIT_REPEAT_WIRE_MARGIN;
+
 		mu_draw_rect(
 			ctx,
-			rightHandleRect,
+			mu_rect(leftWireX, middleY, WIRE_THICKNESS, repeatWireY - middleY),
+			COLOR_WIRE
+		);
+		mu_draw_rect(
+			ctx,
+			mu_rect(rightWireX, middleY, WIRE_THICKNESS, repeatWireY - middleY),
+			COLOR_WIRE
+		);
+		mu_draw_rect(
+			ctx,
+			mu_rect(leftWireX, repeatWireY, rightWireX - leftWireX + WIRE_THICKNESS, WIRE_THICKNESS),
 			COLOR_WIRE
 		);
 	}
 
 	drawRailroad_UnitContents(unit->Contents, (Vec2i) {
-		.x = unit->LeftSpacing + origin.x,
-		.y = origin.y,
+		.x = origin.x + unit->LeftHandleZoneWidth + (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+		.y = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
 	});
 
 	mu_pop_clip_rect(ctx);
 
-	int targetWireSpacing = 0;
-	if (isHover || drag.OriginUnit == unit) {
-		targetWireSpacing = 20;
-	}
+	int targetLeftHandleZoneWidth = Unit_ShouldShowLeftHandle(unit) ? UNIT_HANDLE_ZONE_WIDTH : 0;
+	int targetRightHandleZoneWidth = Unit_ShouldShowRightHandle(unit) ? UNIT_HANDLE_ZONE_WIDTH : 0;
 
 	int animating = 0;
-	unit->LeftSpacing = interp_linear(ctx->dt, unit->LeftSpacing, targetWireSpacing, 160, &animating);
+	unit->LeftHandleZoneWidth = interp_linear(ctx->dt, unit->LeftHandleZoneWidth, targetLeftHandleZoneWidth, 160, &animating);
 	ctx->animating |= animating;
-	unit->RightSpacing = interp_linear(ctx->dt, unit->RightSpacing, targetWireSpacing, 160, &animating);
+	unit->RightHandleZoneWidth = interp_linear(ctx->dt, unit->RightHandleZoneWidth, targetRightHandleZoneWidth, 160, &animating);
 	ctx->animating |= animating;
-
-	int overLeftHandle = unit->LeftSpacing != 0 && mu_mouse_over(ctx, leftHandleRect);
-	int overRightHandle = unit->RightSpacing != 0 && mu_mouse_over(ctx, rightHandleRect);
 
 	if (ctx->mouse_pressed == MU_MOUSE_LEFT && !drag.OriginUnit) {
 		// start drag
 		if (overLeftHandle) {
 			drag = (DragContext) {
 				.OriginUnit = unit,
-				.HandleBeforeUnit = unit->Previous,
-				.HandleAfterUnit = unit,
+				.UnitBeforeHandle = unit->Previous,
+				.UnitAfterHandle = unit,
 			};
 		} else if (overRightHandle) {
 			drag = (DragContext) {
 				.OriginUnit = unit,
-				.HandleBeforeUnit = unit,
-				.HandleAfterUnit = unit->Next,
+				.UnitBeforeHandle = unit,
+				.UnitAfterHandle = unit->Next,
 			};
 		}
 	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.OriginUnit) {
 		// drag finished
 		ctx->animating = 1;
 
-		// TODO: This should actually just be an early-out optimization
-		// for the more general case below. That will prevent
-		// unnecessary groups.
-		if (drag.OriginUnit == unit) {
-			// drag onto this same unit. no group shenanigans!
-			if (overRightHandle && drag.HandleAfterUnit == unit) {
-				// forward drag, skip
-				Unit_SetRepeatMin(unit, 0);
-			} else if (overLeftHandle && drag.HandleBeforeUnit == unit) {
-				// backward drag, repeat
-				Unit_SetRepeatMax(unit, 0);
+		// seek back and forth to figure out what the heck kind of drag this is
+		Unit* groupStartUnit = NULL;
+		Unit* groupEndUnit = NULL;
+		int isForward = 0; // vs. backward
+
+		// seek left from the drag origin to find repetition
+		for (
+			Unit* visitingUnit = drag.UnitBeforeHandle;
+			visitingUnit;
+			visitingUnit = visitingUnit->Previous
+		) {
+			if (
+				(unit == visitingUnit && overLeftHandle)
+				|| (unit->Next == visitingUnit && overRightHandle)
+			) {
+				groupStartUnit = visitingUnit;
+				groupEndUnit = drag.UnitBeforeHandle;
+				isForward = 0;
+				break;
+			}
+		}
+
+		// seek right from the drag origin to find skips
+		for (
+			Unit* visitingUnit = drag.UnitAfterHandle;
+			visitingUnit;
+			visitingUnit = visitingUnit->Next
+		) {
+			if (
+				(unit == visitingUnit && overRightHandle)
+				|| (unit->Previous == visitingUnit && overLeftHandle)
+			) {
+				groupStartUnit = drag.UnitAfterHandle;
+				groupEndUnit = visitingUnit;
+				isForward = 1;
+				break;
+			}
+		}
+
+		if (groupStartUnit) {
+			assert(groupEndUnit);
+
+			if (groupStartUnit == groupEndUnit) {
+				// drag onto this same unit. no group shenanigans!
+				if (isForward) {
+					// forward drag, skip
+					Unit_SetRepeatMin(groupStartUnit, 0);
+				} else {
+					// backward drag, repeat
+					Unit_SetRepeatMax(groupStartUnit, 0);
+				}
 			} else {
-				// must have dropped on the very same handle. do nothing!
-			}
-		} else {
-			// seek back and forth to figure out what the heck kind of drag this is
-			Unit* groupStartUnit = NULL;
-			Unit* groupEndUnit = NULL;
-			int isForward = 0; // vs. backward
-
-			// seek left from the drag origin to find repetition
-			for (
-				Unit* currentUnit = drag.HandleBeforeUnit;
-				currentUnit;
-				currentUnit = currentUnit->Previous
-			) {
-				if (
-					(overLeftHandle && currentUnit == unit)
-					|| (overRightHandle && currentUnit->Previous == unit)
-				) {
-					groupStartUnit = currentUnit;
-					groupEndUnit = drag.HandleBeforeUnit;
-					isForward = 0;
-					break;
-				}
-			}
-
-			// seek right from the drag origin to find skips
-			for (
-				Unit* currentUnit = drag.HandleAfterUnit;
-				currentUnit;
-				currentUnit = currentUnit->Next
-			) {
-				if (
-					(overRightHandle && currentUnit == unit)
-					|| (overLeftHandle && currentUnit->Next == unit)
-				) {
-					groupStartUnit = drag.HandleAfterUnit;
-					groupEndUnit = currentUnit;
-					isForward = 1;
-					break;
-				}
-			}
-
-			// make a group out of it
-			if (groupStartUnit) {
-				assert(groupEndUnit);
-
 				Unit* newUnit = Unit_init((Unit*) pool_alloc(getRegexPool()));
 				newUnit->Contents->Type = RE_CONTENTS_GROUP;
 
@@ -489,8 +537,8 @@ int frame(float dt) {
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
 		drag = (DragContext) {
 			.OriginUnit = NULL,
-			.HandleBeforeUnit = NULL,
-			.HandleAfterUnit = NULL,
+			.UnitBeforeHandle = NULL,
+			.UnitAfterHandle = NULL,
 		};
 	}
 
