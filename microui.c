@@ -496,6 +496,7 @@ void mu_draw_text(mu_Context *ctx, mu_Font font, const char *str, int len,
   if (clipped == MU_CLIP_PART) { mu_set_clip(ctx, mu_get_clip_rect(ctx)); }
   /* add command */
   if (len < 0) { len = strlen(str); }
+  if (!font) { font = ctx->style->font; }
   cmd = mu_push_command(ctx, MU_COMMAND_TEXT, sizeof(mu_TextCommand) + len);
   memcpy(cmd->text.str, str, len);
   cmd->text.str[len] = '\0';
@@ -661,14 +662,11 @@ void mu_draw_control_frame(mu_Context *ctx, mu_Id id, mu_Rect rect,
   ctx->draw_frame(ctx, rect, colorid);
 }
 
-
-void mu_draw_control_text(mu_Context *ctx, const char *str, mu_Rect rect,
-  int colorid, int opt)
-{
+mu_Vec2 mu_position_text(mu_Context *ctx, const char* str, mu_Rect rect, mu_Font font, int opt) {
   mu_Vec2 pos;
-  mu_Font font = ctx->style->font;
+  if (!font) { font = ctx->style->font; }
+
   int tw = ctx->text_width(font, str, -1);
-  mu_push_clip_rect(ctx, rect);
   pos.y = rect.y + (rect.h - ctx->text_height(font)) / 2;
   if (opt & MU_OPT_ALIGNCENTER) {
     pos.x = rect.x + (rect.w - tw) / 2;
@@ -677,6 +675,17 @@ void mu_draw_control_text(mu_Context *ctx, const char *str, mu_Rect rect,
   } else {
     pos.x = rect.x + ctx->style->padding;
   }
+
+  return pos;
+}
+
+void mu_draw_control_text(mu_Context *ctx, const char *str, mu_Rect rect,
+  int colorid, int opt)
+{
+  mu_Font font = ctx->style->font;
+  int tw = ctx->text_width(font, str, -1);
+  mu_push_clip_rect(ctx, rect);
+  mu_Vec2 pos = mu_position_text(ctx, str, rect, font, opt);
   mu_draw_text(ctx, font, str, -1, pos, ctx->style->colors[colorid]);
   mu_pop_clip_rect(ctx);
 }

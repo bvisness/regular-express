@@ -71,6 +71,12 @@ void scroll(int x, int y) {
 	mu_input_scroll(ctx, x, y);
 }
 
+// Utilities
+
+void draw_arbitrary_text(mu_Context* ctx, const char* str, mu_Vec2 pos, mu_Color color) {
+	mu_draw_text(ctx, NULL, str, -1, pos, color);
+}
+
 // --------------------------------------------------------------------
 // --------------------------------------------------------------------
 
@@ -99,9 +105,11 @@ const int UNIT_HANDLE_ZONE_WIDTH = 16;
 const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 12;
 const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
 const int UNIT_REPEAT_WIRE_MARGIN = 5;
+const int UNIT_REPEAT_WIRE_SCOOT = 2;
 const int UNIT_CONTENTS_MIN_HEIGHT = 20;
 const int WIRE_THICKNESS = 2;
 
+const mu_Color COLOR_RE_TEXT = (mu_Color) { 0, 0, 0, 255 };
 const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
 
 void prepass_Regex(Regex* regex);
@@ -189,8 +197,8 @@ void prepass_Group(Group* group) {
 	prepass_Regex(regex);
 
 	group->Size = (Vec2i) {
-		.w = regex->Size.w + 10,
-		.h = regex->Size.h + 10,
+		.w = regex->Size.w,
+		.h = regex->Size.h,
 	};
 }
 
@@ -234,15 +242,30 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 
 	mu_push_clip_rect(ctx, rect);
 
-	// unit itself
-	mu_draw_rect(ctx, rect, mu_color(200, 200, 200, 255));
-
 	int middleY = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT + UNIT_CONTENTS_MIN_HEIGHT/2;
 
-	// thru-wire
+	// thru-wires
 	mu_draw_rect(
 		ctx,
-		mu_rect(origin.x, middleY - WIRE_THICKNESS/2, unit->Size.x, WIRE_THICKNESS),
+		mu_rect(
+			origin.x,
+			middleY - WIRE_THICKNESS/2,
+			unit->LeftHandleZoneWidth + (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+			WIRE_THICKNESS
+		),
+		COLOR_WIRE
+	);
+	mu_draw_rect(
+		ctx,
+		mu_rect(
+			origin.x
+				+ unit->LeftHandleZoneWidth
+				+ (isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
+				+ unit->Contents->Size.x,
+			middleY - WIRE_THICKNESS/2,
+			(isRepeat ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0) + unit->RightHandleZoneWidth,
+			WIRE_THICKNESS
+		),
 		COLOR_WIRE
 	);
 
@@ -289,42 +312,47 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		int skipWireY = middleY
 			- UNIT_CONTENTS_MIN_HEIGHT/2
 			- UNIT_REPEAT_WIRE_MARGIN
+			- UNIT_REPEAT_WIRE_SCOOT
 			- WIRE_THICKNESS;
 
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
+			mu_rect(leftWireX - UNIT_REPEAT_WIRE_SCOOT, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(rightWireX, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
+			mu_rect(rightWireX + UNIT_REPEAT_WIRE_SCOOT, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX, skipWireY, rightWireX - leftWireX + WIRE_THICKNESS, WIRE_THICKNESS),
+			mu_rect(leftWireX - UNIT_REPEAT_WIRE_SCOOT, skipWireY, rightWireX - leftWireX + UNIT_REPEAT_WIRE_SCOOT*2 + WIRE_THICKNESS, WIRE_THICKNESS),
 			COLOR_WIRE
 		);
 	}
 
 	if (unit->RepeatMax != 1) {
 		// draw the repeat wire
-		int repeatWireY = middleY - UNIT_CONTENTS_MIN_HEIGHT/2 + unit->Contents->Size.y + UNIT_REPEAT_WIRE_MARGIN;
+		int repeatWireY = middleY
+			- UNIT_CONTENTS_MIN_HEIGHT/2
+			+ unit->Contents->Size.y
+			+ UNIT_REPEAT_WIRE_MARGIN
+			- UNIT_REPEAT_WIRE_SCOOT;
 
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX, middleY, WIRE_THICKNESS, repeatWireY - middleY),
+			mu_rect(leftWireX + UNIT_REPEAT_WIRE_SCOOT, middleY, WIRE_THICKNESS, repeatWireY - middleY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(rightWireX, middleY, WIRE_THICKNESS, repeatWireY - middleY),
+			mu_rect(rightWireX - UNIT_REPEAT_WIRE_SCOOT, middleY, WIRE_THICKNESS, repeatWireY - middleY),
 			COLOR_WIRE
 		);
 		mu_draw_rect(
 			ctx,
-			mu_rect(leftWireX, repeatWireY, rightWireX - leftWireX + WIRE_THICKNESS, WIRE_THICKNESS),
+			mu_rect(leftWireX + UNIT_REPEAT_WIRE_SCOOT, repeatWireY, rightWireX - leftWireX - UNIT_REPEAT_WIRE_SCOOT*2 + WIRE_THICKNESS, WIRE_THICKNESS),
 			COLOR_WIRE
 		);
 	}
@@ -477,16 +505,20 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
 	mu_draw_rect(
 		ctx,
 		r,
-		mu_color(150, 150, 150, 255)
+		mu_color(0, 0, 0, 50)
 	);
 
 	mu_layout_set_next(ctx, r, 0);
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
-			mu_label(ctx, contents->LitChar->_buf);
+			char* str = contents->LitChar->_buf;
+			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
+			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_METACHAR: {
-			mu_label(ctx, &contents->MetaChar->_backslash);
+			char* str = &contents->MetaChar->_backslash;
+			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
+			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_SPECIAL: {
 			// TODO: DO IT
@@ -502,13 +534,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
 }
 
 void drawRailroad_Group(Group* group, Vec2i origin) {
-	mu_draw_rect(
-		ctx,
-		mu_rect(origin.x, origin.y, group->Size.w, group->Size.h),
-		mu_color(100, 100, 100, 255)
-	);
-
-	drawRailroad_Regex(group->Regex, (Vec2i) { .x = origin.x + 5, .y = origin.y + 5 });
+	drawRailroad_Regex(group->Regex, (Vec2i) { .x = origin.x, .y = origin.y });
 }
 
 int frame(float dt) {

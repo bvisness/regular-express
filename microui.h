@@ -113,7 +113,14 @@ typedef MU_REAL mu_Real;
 typedef void* mu_Font;
 
 typedef struct { int x, y; } mu_Vec2;
-typedef struct { int x, y, w, h; } mu_Rect;
+typedef struct {
+  union {
+    struct { int x, y; };
+    mu_Vec2 xy;
+  };
+
+  int w, h;
+} mu_Rect;
 typedef struct { unsigned char r, g, b, a; } mu_Color;
 typedef struct { mu_Id id; int last_update; } mu_PoolItem;
 
@@ -269,6 +276,7 @@ void mu_layout_set_next(mu_Context *ctx, mu_Rect r, int relative);
 mu_Rect mu_layout_next(mu_Context *ctx);
 
 void mu_draw_control_frame(mu_Context *ctx, mu_Id id, mu_Rect rect, int colorid, int opt);
+mu_Vec2 mu_position_text(mu_Context *ctx, const char* str, mu_Rect rect, mu_Font font, int opt);
 void mu_draw_control_text(mu_Context *ctx, const char *str, mu_Rect rect, int colorid, int opt);
 int mu_mouse_over(mu_Context *ctx, mu_Rect rect);
 void mu_update_control(mu_Context *ctx, mu_Id id, mu_Rect rect, int opt);

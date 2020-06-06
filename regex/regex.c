@@ -18,14 +18,18 @@ int Unit_ShouldShowWires(Unit* unit) {
     return unit->IsHover || unit->IsDragOrigin || Unit_IsRepeat(unit);
 }
 
+int Unit_ShouldShowHandles(Unit* unit) {
+    return Unit_ShouldShowWires(unit);
+}
+
 int Unit_ShouldShowLeftHandle(Unit* unit) {
-    return Unit_ShouldShowWires(unit) && !unit->Previous;
+    return Unit_ShouldShowHandles(unit) && !unit->Previous;
 }
 
 int Unit_ShouldShowRightHandle(Unit* unit) {
     return (
-        Unit_ShouldShowWires(unit)
-        || (unit->Next && Unit_ShouldShowWires(unit->Next))
+        Unit_ShouldShowHandles(unit)
+        || (unit->Next && Unit_ShouldShowHandles(unit->Next))
     );
 }
 

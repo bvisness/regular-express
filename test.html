@@ -127,7 +127,7 @@
 							ctx.clip();
 						},
 						canvas_rect: (x, y, w, h, r, g, b, a) => {
-							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
 							ctx.fillRect(x * dpr, y * dpr, w * dpr, h * dpr);
 						},
 						canvas_circle: (x, y, radius, r, g, b, a) => {
