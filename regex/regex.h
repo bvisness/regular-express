@@ -44,6 +44,8 @@ struct Regex {
     int WireHeight;
 };
 
+void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex);
+
 typedef struct NoUnionEx {
     int NumUnits;
     struct Unit* Units[MAX_UNITS];
@@ -51,6 +53,10 @@ typedef struct NoUnionEx {
     Vec2i Size;
     int WireHeight;
 } NoUnionEx;
+
+void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index);
+struct Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index);
+void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit);
 
 typedef struct Unit {
     struct UnitContents* Contents;
@@ -67,8 +73,7 @@ typedef struct Unit {
     mu_Rect LastRect;
 
     struct NoUnionEx* Parent;
-    struct Unit* Previous;
-    struct Unit* Next;
+    int Index;
 
     int IsHover;
     int IsDragOrigin;
@@ -77,6 +82,8 @@ typedef struct Unit {
     float RightHandleZoneWidth;
 } Unit;
 
+Unit* Unit_Previous(Unit* unit);
+Unit* Unit_Next(Unit* unit);
 void Unit_SetRepeatMin(Unit* unit, int val);
 void Unit_SetRepeatMax(Unit* unit, int val);
 int Unit_IsNonSingular(Unit* unit);
@@ -146,20 +153,6 @@ typedef struct MetaChar {
         char _buf[2];
     };
 } MetaChar;
-
-typedef union RegexType {
-    Regex Regex;
-    NoUnionEx NoUnionEx;
-    Unit Unit;
-    UnitContents UnitContents;
-    Group Group;
-    Set Set;
-    SetItem SetItem;
-    SetItemRange SetItemRange;
-    Special Special;
-    LitChar LitChar;
-    MetaChar MetaChar;
-} RegexType;
 
 
 char* ToString(Regex* regex);

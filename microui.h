@@ -103,7 +103,11 @@ enum {
   MU_KEY_CTRL         = (1 << 1),
   MU_KEY_ALT          = (1 << 2),
   MU_KEY_BACKSPACE    = (1 << 3),
-  MU_KEY_RETURN       = (1 << 4)
+  MU_KEY_RETURN       = (1 << 4),
+  MU_KEY_ARROWLEFT    = (1 << 5),
+  MU_KEY_ARROWRIGHT   = (1 << 6),
+  MU_KEY_ARROWUP      = (1 << 7),
+  MU_KEY_ARROWDOWN    = (1 << 8)
 };
 
 

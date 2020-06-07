@@ -31,14 +31,16 @@ void doTree_Regex(mu_Context* ctx, Regex* regex) {
 		if (mu_button(ctx, "-")) {
 			if (regex->NumUnionMembers > 0) {
 				regex->NumUnionMembers--;
-				pool_free(getRegexPool(), regex->UnionMembers[regex->NumUnionMembers]);
+				RE_FREE(NoUnionEx, regex->UnionMembers[regex->NumUnionMembers]);
 				// TODO: Cascading frees, here and everywhere
 			}
 		}
 		if (mu_button(ctx, "+")) {
-			NoUnionEx* ex = NoUnionEx_init((NoUnionEx*) pool_alloc(getRegexPool()));
-			regex->UnionMembers[regex->NumUnionMembers] = ex;
-			regex->NumUnionMembers++;
+			NoUnionEx* ex = NoUnionEx_init(RE_NEW(NoUnionEx));
+			Regex_AddUnionMember(regex, ex);
+
+			Unit* initialUnit = Unit_init(RE_NEW(Unit));
+			NoUnionEx_AddUnit(ex, initialUnit, -1);
 		}
 
 		mu_layout_row(ctx, 1, (int[]) { -1 }, 0);
@@ -60,13 +62,12 @@ void doTree_NoUnionEx(mu_Context* ctx, NoUnionEx* ex) {
 		if (mu_button(ctx, "-")) {
 			if (ex->NumUnits > 0) {
 				ex->NumUnits--;
-				pool_free(getRegexPool(), ex->Units[ex->NumUnits]);
+				RE_FREE(Unit, ex->Units[ex->NumUnits]);
 			}
 		}
 		if (mu_button(ctx, "+")) {
-			Unit* unit = Unit_init((Unit*) pool_alloc(getRegexPool()));
-			ex->Units[ex->NumUnits] = unit;
-			ex->NumUnits++;
+			Unit* unit = Unit_init(RE_NEW(Unit));
+			NoUnionEx_AddUnit(ex, unit, -1);
 		}
 
 		mu_layout_row(ctx, 1, (int[]) { -1 }, 0);
@@ -89,11 +90,21 @@ void doTree_Unit(mu_Context* ctx, Unit* unit) {
 		}
 
 		if (mu_begin_popup(ctx, "Unit Type")) {
-			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_LITCHAR))) unit->Contents->Type = RE_CONTENTS_LITCHAR;
-			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_METACHAR))) unit->Contents->Type = RE_CONTENTS_METACHAR;
-			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_SPECIAL))) unit->Contents->Type = RE_CONTENTS_SPECIAL;
-			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_SET))) unit->Contents->Type = RE_CONTENTS_SET;
-			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_GROUP))) unit->Contents->Type = RE_CONTENTS_GROUP;
+			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_LITCHAR))) {
+				UnitContents_SetType(unit->Contents, RE_CONTENTS_LITCHAR);
+			}
+			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_METACHAR))) {
+				UnitContents_SetType(unit->Contents, RE_CONTENTS_METACHAR);
+			}
+			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_SPECIAL))) {
+				UnitContents_SetType(unit->Contents, RE_CONTENTS_SPECIAL);
+			}
+			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_SET))) {
+				UnitContents_SetType(unit->Contents, RE_CONTENTS_SET);
+			}
+			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_GROUP))) {
+				UnitContents_SetType(unit->Contents, RE_CONTENTS_GROUP);
+			}
 
 			// TODO: Initialize other kinds of content types
 
@@ -178,11 +189,11 @@ void doTree_Set(mu_Context* ctx, Set* set) {
 		if (mu_button(ctx, "-")) {
 			if (set->NumItems > 0) {
 				set->NumItems--;
-				pool_free(getRegexPool(), set->Items[set->NumItems]);
+				RE_FREE(SetItem, set->Items[set->NumItems]);
 			}
 		}
 		if (mu_button(ctx, "+")) {
-			SetItem* item = SetItem_init((SetItem*) pool_alloc(getRegexPool()));
+			SetItem* item = SetItem_init(RE_NEW(SetItem));
 			set->Items[set->NumItems] = item;
 			set->NumItems++;
 		}

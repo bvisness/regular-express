@@ -92,7 +92,13 @@ DragContext drag;
 Regex* regex;
 
 void init() {
-	regex = Regex_init((Regex*) pool_alloc(getRegexPool()));
+	regex = Regex_init(RE_NEW(Regex));
+
+	const char* initialString = "Hello";
+	for (int i = 0; i < strlen(initialString); i++) {
+		Unit* unit = Unit_initWithLiteralChar(RE_NEW(Unit), *(initialString + i));
+		NoUnionEx_AddUnit(regex->UnionMembers[0], unit, -1);
+	}
 
 	ctx = malloc(sizeof(mu_Context));
 	mu_init(ctx);
@@ -111,9 +117,12 @@ const int UNIT_REPEAT_WIRE_SCOOT = 2;
 const int UNIT_CONTENTS_MIN_HEIGHT = 20;
 const int WIRE_THICKNESS = 2;
 const int GROUP_VERTICAL_PADDING = 0;
+const int CURSOR_THICKNESS = 2;
+const int CURSOR_VERTICAL_PADDING = 2;
 
 const mu_Color COLOR_RE_TEXT = (mu_Color) { 0, 0, 0, 255 };
 const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
+const mu_Color COLOR_CURSOR = (mu_Color) { 45, 83, 252, 255 };
 
 void prepass_Regex(Regex* regex);
 void prepass_NoUnionEx(NoUnionEx* ex);
@@ -154,8 +163,8 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 	int h = NOUNIONEX_MIN_HEIGHT;
 	int wireHeight = NOUNIONEX_MIN_HEIGHT/2;
 
-	for (int j = 0; j < ex->NumUnits; j++) {
-		Unit* unit = ex->Units[j];
+	for (int i = 0; i < ex->NumUnits; i++) {
+		Unit* unit = ex->Units[i];
 		prepass_Unit(unit);
 
 		w += unit->Size.w;
@@ -163,8 +172,7 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 		wireHeight = imax(wireHeight, unit->WireHeight);
 
 		unit->Parent = ex;
-		unit->Previous = (j == 0) ? NULL : ex->Units[j-1];
-		unit->Next = (j == ex->NumUnits - 1) ? NULL : ex->Units[j+1];
+		unit->Index = i;
 	}
 
 	ex->Size = (Vec2i) { .w = w, .h = h };
@@ -334,6 +342,8 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin) {
 }
 
 void drawRailroad_Unit(Unit* unit, Vec2i origin) {
+	mu_Id muid = mu_get_id(ctx, &unit, sizeof(Unit*));
+
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
 	int isHover = mu_mouse_over(ctx, rect);
 	int isDragOrigin = (drag.OriginUnit == unit);
@@ -463,10 +473,69 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		);
 	}
 
+	mu_Rect contentsRect = mu_rect(
+		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+		origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
+		unit->Contents->Size.w,
+		unit->Contents->Size.h
+	);
 	drawRailroad_UnitContents(unit->Contents, (Vec2i) {
-		.x = origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
-		.y = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
+		.x = contentsRect.x,
+		.y = contentsRect.y,
 	});
+
+	if (ctx->focus == muid) {
+		ctx->updated_focus = 1;
+
+		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+
+			Unit* prev = Unit_Previous(unit);
+			if (prev) {
+				mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+			}
+		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+
+			Unit* next = Unit_Next(unit);
+			if (next) {
+				mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+			}
+		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
+			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+
+			Unit* prev = Unit_Previous(unit);
+			Unit* next = Unit_Next(unit);
+			if (prev) {
+				mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+			} else if (next) {
+				mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+			}
+
+			NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
+		} else if (strlen(ctx->input_text) == 1) {
+			Unit* newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), *ctx->input_text);
+			NoUnionEx_AddUnit(unit->Parent, newUnit, unit->Index + 1);
+			mu_set_focus(ctx, mu_get_id(ctx, &newUnit, sizeof(Unit*)));
+
+			ctx->input_text[0] = 0;
+		}
+	}
+
+	// again, because we may have changed the focus
+	if (ctx->focus == muid) {
+		// draw cursor
+		mu_draw_rect(
+			ctx,
+			mu_rect(
+				contentsRect.x + contentsRect.w - 1 - CURSOR_THICKNESS,
+				contentsRect.y + CURSOR_VERTICAL_PADDING,
+				CURSOR_THICKNESS,
+				contentsRect.h - CURSOR_VERTICAL_PADDING*2
+			),
+			COLOR_CURSOR
+		);
+	}
 
 	mu_pop_clip_rect(ctx);
 
@@ -479,20 +548,26 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 	unit->RightHandleZoneWidth = interp_linear(ctx->dt, unit->RightHandleZoneWidth, targetRightHandleZoneWidth, 160, &animating);
 	ctx->animating |= animating;
 
-	if (ctx->mouse_pressed == MU_MOUSE_LEFT && !drag.OriginUnit) {
-		// start drag
-		if (overLeftHandle) {
-			drag = (DragContext) {
-				.OriginUnit = unit,
-				.UnitBeforeHandle = unit->Previous,
-				.UnitAfterHandle = unit,
-			};
-		} else if (overRightHandle) {
-			drag = (DragContext) {
-				.OriginUnit = unit,
-				.UnitBeforeHandle = unit,
-				.UnitAfterHandle = unit->Next,
-			};
+	if (ctx->mouse_pressed == MU_MOUSE_LEFT) {
+		if (mu_mouse_over(ctx, contentsRect) && unit->Contents->Type == RE_CONTENTS_LITCHAR) {
+			mu_set_focus(ctx, muid);
+		}
+
+		if (!drag.OriginUnit) {
+			// maybe start drag
+			if (overLeftHandle) {
+				drag = (DragContext) {
+					.OriginUnit = unit,
+					.UnitBeforeHandle = Unit_Previous(unit),
+					.UnitAfterHandle = unit,
+				};
+			} else if (overRightHandle) {
+				drag = (DragContext) {
+					.OriginUnit = unit,
+					.UnitBeforeHandle = unit,
+					.UnitAfterHandle = Unit_Next(unit),
+				};
+			}
 		}
 	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.OriginUnit) {
 		// drag finished
@@ -504,36 +579,38 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		int isForward = 0; // vs. backward
 
 		// seek left from the drag origin to find repetition
-		for (
-			Unit* visitingUnit = drag.UnitBeforeHandle;
-			visitingUnit;
-			visitingUnit = visitingUnit->Previous
-		) {
-			if (
-				(unit == visitingUnit && overLeftHandle)
-				|| (unit->Next == visitingUnit && overRightHandle)
-			) {
-				groupStartUnit = visitingUnit;
-				groupEndUnit = drag.UnitBeforeHandle;
-				isForward = 0;
-				break;
+		if (drag.UnitBeforeHandle) {
+			NoUnionEx* ex = drag.UnitBeforeHandle->Parent;
+			for (int i = drag.UnitBeforeHandle->Index; i >= 0; i--) {
+				Unit* visitingUnit = ex->Units[i];
+
+				if (
+					(unit == visitingUnit && overLeftHandle)
+					|| (Unit_Next(unit) == visitingUnit && overRightHandle)
+				) {
+					groupStartUnit = visitingUnit;
+					groupEndUnit = drag.UnitBeforeHandle;
+					isForward = 0;
+					break;
+				}
 			}
 		}
 
 		// seek right from the drag origin to find skips
-		for (
-			Unit* visitingUnit = drag.UnitAfterHandle;
-			visitingUnit;
-			visitingUnit = visitingUnit->Next
-		) {
-			if (
-				(unit == visitingUnit && overRightHandle)
-				|| (unit->Previous == visitingUnit && overLeftHandle)
-			) {
-				groupStartUnit = drag.UnitAfterHandle;
-				groupEndUnit = visitingUnit;
-				isForward = 1;
-				break;
+		if (drag.UnitAfterHandle) {
+			NoUnionEx* ex = drag.UnitAfterHandle->Parent;
+			for (int i = drag.UnitAfterHandle->Index; i < ex->NumUnits; i++) {
+				Unit* visitingUnit = ex->Units[i];
+
+				if (
+					(unit == visitingUnit && overRightHandle)
+					|| (Unit_Previous(unit) == visitingUnit && overLeftHandle)
+				) {
+					groupStartUnit = drag.UnitAfterHandle;
+					groupEndUnit = visitingUnit;
+					isForward = 1;
+					break;
+				}
 			}
 		}
 
@@ -550,23 +627,20 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 					Unit_SetRepeatMax(groupStartUnit, 0);
 				}
 			} else {
-				Unit* newUnit = Unit_init((Unit*) pool_alloc(getRegexPool()));
-				newUnit->Contents->Type = RE_CONTENTS_GROUP;
+				int parent = groupStartUnit->Parent;
+				int startIndex = groupStartUnit->Index;
+				int endIndex = groupEndUnit->Index;
+
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
 
 				NoUnionEx* ex = newUnit->Contents->Group->Regex->UnionMembers[0];
 
-				{
-					Unit* currentUnit = groupStartUnit;
-					ex->NumUnits = 0;
-					while (currentUnit) {
-						ex->Units[ex->NumUnits] = currentUnit;
-						ex->NumUnits++;
+				for (Unit* currentUnit = groupStartUnit; currentUnit; currentUnit = Unit_Next(currentUnit)) {
+					NoUnionEx_AddUnit(ex, currentUnit, -1);
 
-						if (currentUnit == groupEndUnit) {
-							break;
-						}
-
-						currentUnit = currentUnit->Next;
+					if (currentUnit == groupEndUnit) {
+						break;
 					}
 				}
 
@@ -576,30 +650,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 					Unit_SetRepeatMax(newUnit, 0);
 				}
 
-				NoUnionEx* parent = groupStartUnit->Parent;
-
-				newUnit->Parent = parent;
-				newUnit->Previous = groupStartUnit->Previous;
-				newUnit->Next = groupEndUnit->Next;
-				if (newUnit->Previous) {
-					newUnit->Previous->Next = newUnit;
-				}
-				if (newUnit->Next) {
-					newUnit->Next->Previous = newUnit;
-				}
-				groupStartUnit->Previous = NULL;
-				groupEndUnit->Next = NULL;
-
-				{
-					Unit* currentUnit = newUnit->Previous ? parent->Units[0] : newUnit;
-					parent->NumUnits = 0;
-					while (currentUnit) {
-						parent->Units[parent->NumUnits] = currentUnit;
-						parent->NumUnits++;
-
-						currentUnit = currentUnit->Next;
-					}
-				}
+				NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
 			}
 		}
 	}
@@ -618,7 +669,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
 			);
 
 			char* str = contents->LitChar->_buf;
-			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
+			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_METACHAR: {

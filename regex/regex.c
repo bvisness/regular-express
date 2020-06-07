@@ -1,5 +1,79 @@
 #include "regex.h"
 
+void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
+    regex->UnionMembers[regex->NumUnionMembers] = ex;
+    regex->NumUnionMembers++;
+}
+
+void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
+    assert(ex->NumUnits < MAX_UNITS);
+
+    if (index == -1) {
+        ex->Units[ex->NumUnits] = unit;
+        ex->NumUnits++;
+        return;
+    }
+
+    // shift units over
+    for (int i = ex->NumUnits - 1; i >= index; i--) {
+        ex->Units[i + 1] = ex->Units[i];
+        ex->Units[i + 1]->Index = i + 1;
+    }
+
+    unit->Parent = ex;
+    unit->Index = index;
+
+    ex->Units[index] = unit;
+    ex->NumUnits++;
+}
+
+Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index) {
+    assert(ex->NumUnits > 0);
+
+    if (index == -1) {
+        ex->NumUnits--;
+        Unit* unit = ex->Units[ex->NumUnits];
+        return unit;
+    }
+
+    Unit* unit = ex->Units[index];
+
+    ex->NumUnits--;
+    for (int i = index; i < ex->NumUnits; i++) {
+        ex->Units[i] = ex->Units[i + 1];
+    }
+
+    return unit;
+}
+
+void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit) {
+    // TODO: This could someday be more efficient by doing one big shift.
+    for (int i = 0; i < End - Start + 1; i++) {
+        NoUnionEx_RemoveUnit(ex, Start);
+    }
+
+    NoUnionEx_AddUnit(ex, unit, Start);
+
+    // TODO: We can't return all the units that got replaced! What if we need
+    // to free them?
+}
+
+Unit* Unit_Previous(Unit* unit) {
+    if (unit->Index == 0) {
+        return NULL;
+    }
+
+    return unit->Parent->Units[unit->Index - 1];
+}
+
+Unit* Unit_Next(Unit* unit) {
+    if (unit->Index + 1 >= unit->Parent->NumUnits) {
+        return NULL;
+    }
+
+    return unit->Parent->Units[unit->Index + 1];
+}
+
 void Unit_SetRepeatMin(Unit* unit, int val) {
     unit->RepeatMin = val;
     unit->_minbuf = (float) val;
@@ -31,13 +105,13 @@ int Unit_ShouldShowHandles(Unit* unit) {
 }
 
 int Unit_ShouldShowLeftHandle(Unit* unit) {
-    return Unit_ShouldShowHandles(unit) && !unit->Previous;
+    return Unit_ShouldShowHandles(unit) && !Unit_Previous(unit);
 }
 
 int Unit_ShouldShowRightHandle(Unit* unit) {
     return (
         Unit_ShouldShowHandles(unit)
-        || (unit->Next && Unit_ShouldShowHandles(unit->Next))
+        || (Unit_Next(unit) && Unit_ShouldShowHandles(Unit_Next(unit)))
     );
 }
 

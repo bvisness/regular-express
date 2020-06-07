@@ -1,11 +1,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <debug.h>
+#include <stdio.h>
 
 #include "pool.h"
 
 void pool_init(
     Pool *p,
+    const char* name,
     void *backing_buffer,
     size_t backing_buffer_length,
     size_t chunk_size
@@ -20,15 +22,16 @@ void pool_init(
     // chunk_size = align_forward_size(chunk_size, chunk_alignment);
 
     // Assert that the parameters passed are valid
-    assert(chunk_size >= sizeof(PoolFreeNode) &&
-           "Chunk size is too small");
+    // assert(chunk_size >= sizeof(PoolFreeNode) &&
+    //        "Chunk size is too small");
     assert(backing_buffer_length >= chunk_size &&
            "Backing buffer length is smaller than the chunk size");
 
     // Store the adjusted parameters
+    p->name = name;
     p->buf = (unsigned char *)backing_buffer;
     p->buf_len = backing_buffer_length;
-    p->chunk_size = chunk_size;
+    p->chunk_size = (chunk_size >= sizeof(PoolFreeNode) ? chunk_size : sizeof(PoolFreeNode));
     p->head = NULL; // Free List Head
 
     // Set up the free list for free chunks
@@ -40,6 +43,7 @@ void *pool_alloc(Pool *p) {
     PoolFreeNode *node = p->head;
 
     if (node == NULL) {
+        fprintf(stderr, "In pool %s:", p->name);
         assert(0 && "Pool allocator has no free memory");
         return NULL;
     }
