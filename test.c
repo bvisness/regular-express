@@ -80,6 +80,11 @@ void draw_arbitrary_text(mu_Context* ctx, const char* str, mu_Vec2 pos, mu_Color
 // --------------------------------------------------------------------
 // --------------------------------------------------------------------
 
+enum {
+	DRAG_START_LEFT_HANDLE,
+	DRAG_START_RIGHT_HANDLE
+};
+
 typedef struct DragContext {
 	Unit* OriginUnit;
 
@@ -87,6 +92,7 @@ typedef struct DragContext {
 	Unit* UnitAfterHandle;
 
 	Vec2i StartPos;
+	int StartEntity;
 } DragContext;
 
 DragContext drag;
@@ -566,20 +572,14 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 					.OriginUnit = unit,
 					.UnitBeforeHandle = Unit_Previous(unit),
 					.UnitAfterHandle = unit,
-					.StartPos = (Vec2i) {
-						.x = leftHandleRect.x + leftHandleRect.w/2,
-						.y = leftHandleRect.y + leftHandleRect.h/2,
-					},
+					.StartEntity = DRAG_START_LEFT_HANDLE,
 				};
 			} else if (overRightHandle) {
 				drag = (DragContext) {
 					.OriginUnit = unit,
 					.UnitBeforeHandle = unit,
 					.UnitAfterHandle = Unit_Next(unit),
-					.StartPos = (Vec2i) {
-						.x = rightHandleRect.x + rightHandleRect.w/2,
-						.y = rightHandleRect.y + rightHandleRect.h/2,
-					},
+					.StartEntity = DRAG_START_RIGHT_HANDLE,
 				};
 			}
 		}
@@ -666,6 +666,20 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 
 				NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
 			}
+		}
+	}
+
+	if (ctx->mouse_down & MU_MOUSE_LEFT && drag.OriginUnit == unit) {
+		if (drag.StartEntity == DRAG_START_LEFT_HANDLE) {
+			drag.StartPos = (Vec2i) {
+				.x = leftHandleRect.x + leftHandleRect.w/2,
+				.y = leftHandleRect.y + leftHandleRect.h/2,
+			};
+		} else if (drag.StartEntity == DRAG_START_RIGHT_HANDLE) {
+			drag.StartPos = (Vec2i) {
+				.x = rightHandleRect.x + rightHandleRect.w/2,
+				.y = rightHandleRect.y + rightHandleRect.h/2,
+			};
 		}
 	}
 }
@@ -792,7 +806,7 @@ int frame(float dt) {
 		mu_end_window(ctx);
 	}
 
-	if (mu_begin_window(ctx, "Tree View",mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 300))) {
+	if (mu_begin_window(ctx, "Tree View",mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 400))) {
 		doTree(ctx, regex);
 
 		mu_end_window(ctx);
