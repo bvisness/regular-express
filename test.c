@@ -85,6 +85,8 @@ typedef struct DragContext {
 
 	Unit* UnitBeforeHandle;
 	Unit* UnitAfterHandle;
+
+	Vec2i StartPos;
 } DragContext;
 
 DragContext drag;
@@ -386,6 +388,8 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 	const int HANDLE_SIZE = 8;
 	int handleY = middleY - HANDLE_SIZE/2;
 
+	mu_Rect leftHandleRect;
+	mu_Rect rightHandleRect;
 	int overLeftHandle = 0;
 	int overRightHandle = 0;
 
@@ -394,6 +398,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		int handleX = origin.x + unit->LeftHandleZoneWidth/2 - HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
 		mu_draw_rect(ctx, handleRect, COLOR_WIRE);
+		leftHandleRect = handleRect;
 		overLeftHandle = mu_mouse_over(ctx, handleRect);
 	}
 	// right handle
@@ -407,6 +412,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 			- HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
 		mu_draw_rect(ctx, handleRect, COLOR_WIRE);
+		rightHandleRect = handleRect;
 		overRightHandle = mu_mouse_over(ctx, handleRect);
 	}
 
@@ -560,12 +566,20 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 					.OriginUnit = unit,
 					.UnitBeforeHandle = Unit_Previous(unit),
 					.UnitAfterHandle = unit,
+					.StartPos = (Vec2i) {
+						.x = leftHandleRect.x + leftHandleRect.w/2,
+						.y = leftHandleRect.y + leftHandleRect.h/2,
+					},
 				};
 			} else if (overRightHandle) {
 				drag = (DragContext) {
 					.OriginUnit = unit,
 					.UnitBeforeHandle = unit,
 					.UnitAfterHandle = Unit_Next(unit),
+					.StartPos = (Vec2i) {
+						.x = rightHandleRect.x + rightHandleRect.w/2,
+						.y = rightHandleRect.y + rightHandleRect.h/2,
+					},
 				};
 			}
 		}
@@ -721,22 +735,66 @@ void drawRailroad_Group(Group* group, Vec2i origin) {
 int frame(float dt) {
 	mu_begin(ctx, dt);
 
-	if (mu_begin_window(ctx, "Tree View", mu_rect(10, 10, 500, 800))) {
-		doTree(ctx, regex);
+	const int PAGE_WIDTH = 800;
+	const int WINDOW_PADDING = 10;
+	const int GUI_HEIGHT = 300;
+
+	prepass_Regex(regex);
+	if (mu_begin_window_ex(ctx, "Test", mu_rect(WINDOW_PADDING, WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, GUI_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
+		drawRailroad_Regex(regex, (Vec2i) {
+			.x = PAGE_WIDTH/2 - regex->Size.x/2,
+			.y = WINDOW_PADDING + GUI_HEIGHT/2 - regex->Size.y/2,
+		});
+
+		if (drag.OriginUnit) {
+			// draw preview
+			int offsetX = ctx->mouse_pos.x - drag.StartPos.x;
+			int previewY = drag.StartPos.y - iclamp(1/1.618f * offsetX, -40, 40);
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					imin(ctx->mouse_pos.x, drag.StartPos.x) - WIRE_THICKNESS/2,
+					previewY - WIRE_THICKNESS/2,
+					WIRE_THICKNESS/2 + iabs(offsetX) + WIRE_THICKNESS/2,
+					WIRE_THICKNESS
+				),
+				COLOR_WIRE
+			);
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					drag.StartPos.x - WIRE_THICKNESS/2,
+					imin(previewY, drag.StartPos.y) - WIRE_THICKNESS/2,
+					WIRE_THICKNESS,
+					WIRE_THICKNESS/2 + iabs(previewY - drag.StartPos.y) + WIRE_THICKNESS/2
+				),
+				COLOR_WIRE
+			);
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					ctx->mouse_pos.x - WIRE_THICKNESS/2,
+					imin(previewY, ctx->mouse_pos.y) - WIRE_THICKNESS/2,
+					WIRE_THICKNESS,
+					WIRE_THICKNESS/2 + iabs(previewY - ctx->mouse_pos.y) + WIRE_THICKNESS/2
+				),
+				COLOR_WIRE
+			);
+		}
 
 		mu_end_window(ctx);
 	}
 
-	if (mu_begin_window(ctx, "Final Regex", mu_rect(520, 10, 500, 80))) {
+	if (mu_begin_window(ctx, "Final Regex", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 80))) {
 		mu_layout_row(ctx, 1, (int[]) { -1 }, -1);
 		mu_label(ctx, ToString(regex));
 
 		mu_end_window(ctx);
 	}
 
-	prepass_Regex(regex);
-	if (mu_begin_window_ex(ctx, "Test", mu_rect(520, 300, 500, 500), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
-		drawRailroad_Regex(regex, (Vec2i) { .x = 520, .y = 300 });
+	if (mu_begin_window(ctx, "Tree View",mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 300))) {
+		doTree(ctx, regex);
+
 		mu_end_window(ctx);
 	}
 
