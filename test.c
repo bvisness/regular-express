@@ -85,12 +85,18 @@ enum {
 	DRAG_WIRE_RIGHT_HANDLE
 };
 
-typedef struct UnitSelection {
+typedef struct UnitRange {
 	Unit* StartUnit;
-	int Len;
-} UnitSelection;
+	Unit* EndUnit;
+} UnitRange;
 
-UnitSelection selection;
+UnitRange selection;
+
+#define ITER_UnitRange(range, it) for ( 						\
+	Unit *(it) = (range).StartUnit; 							\
+	(it); 														\
+	(it) = ((it) == (range).EndUnit) ? NULL : Unit_Next(it) 	\
+)
 
 enum {
 	DRAG_TYPE_NONE,
@@ -109,8 +115,7 @@ typedef struct DragWire {
 
 typedef struct PotentialSelect {
 	int Valid;
-	Unit* StartUnit;
-	Unit* EndUnit;
+	UnitRange Range;
 } PotentialSelect;
 
 #define MAX_POTENTIAL_SELECTS 16
@@ -119,7 +124,7 @@ typedef struct DragBoxSelect {
 	Vec2i StartPos;
 	mu_Rect Rect;
 
-	UnitSelection CurrentSelection;
+	UnitRange CurrentSelection;
 	PotentialSelect Potentials[MAX_POTENTIAL_SELECTS];
 } DragBoxSelect;
 
@@ -133,6 +138,20 @@ typedef struct DragContext {
 } DragContext;
 
 DragContext drag;
+
+// TODO: Please move this somewhere else. This is all way too big.
+Unit* RangeToGroup(UnitRange range) {
+	Unit* newUnit = Unit_init(RE_NEW(Unit));
+	UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
+
+	NoUnionEx* ex = newUnit->Contents->Group->Regex->UnionMembers[0];
+
+	ITER_UnitRange(range, it) {
+		NoUnionEx_AddUnit(ex, it, -1);
+	}
+
+	return newUnit;
+}
 
 Regex* regex;
 
@@ -401,11 +420,21 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		&& drag.Wire.OriginUnit == unit
 	);
 	int nonSingular = Unit_IsNonSingular(unit);
+	int isSelected = 0;
+	{
+		ITER_UnitRange(selection, it) {
+			if (it == unit) {
+				isSelected = 1;
+				break;
+			}
+		}
+	}
 
 	// save some of 'em for the next pass
 	unit->LastRect = rect;
 	unit->IsHover = isHover;
 	unit->IsWireDragOrigin = isWireDragOrigin;
+	unit->IsSelected = isSelected;
 
 	mu_push_clip_rect(ctx, rect);
 
@@ -530,18 +559,6 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		);
 	}
 
-	int selected = 0;
-	{
-		Unit* currentUnit = selection.StartUnit;
-		for (int i = 0; i < selection.Len; i++) {
-			if (currentUnit == unit) {
-				selected = 1;
-				break;
-			}
-			currentUnit = Unit_Next(currentUnit);
-		}
-	}
-
 	mu_Rect contentsRect = mu_rect(
 		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
 		origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
@@ -555,7 +572,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 			.y = contentsRect.y,
 		},
 		depth,
-		selected
+		isSelected
 	);
 
 	if (ctx->focus == muid) {
@@ -661,8 +678,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		ctx->animating = 1;
 
 		// seek back and forth to figure out what the heck kind of drag this is
-		Unit* groupStartUnit = NULL;
-		Unit* groupEndUnit = NULL;
+		UnitRange groupUnits = {0};
 		int isForward = 0; // vs. backward
 
 		// seek left from the drag origin to find repetition
@@ -675,8 +691,8 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 					(unit == visitingUnit && overLeftHandle)
 					|| (Unit_Next(unit) == visitingUnit && overRightHandle)
 				) {
-					groupStartUnit = visitingUnit;
-					groupEndUnit = drag.Wire.UnitBeforeHandle;
+					groupUnits.StartUnit = visitingUnit;
+					groupUnits.EndUnit = drag.Wire.UnitBeforeHandle;
 					isForward = 0;
 					break;
 				}
@@ -693,43 +709,32 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 					(unit == visitingUnit && overRightHandle)
 					|| (Unit_Previous(unit) == visitingUnit && overLeftHandle)
 				) {
-					groupStartUnit = drag.Wire.UnitAfterHandle;
-					groupEndUnit = visitingUnit;
+					groupUnits.StartUnit = drag.Wire.UnitAfterHandle;
+					groupUnits.EndUnit = visitingUnit;
 					isForward = 1;
 					break;
 				}
 			}
 		}
 
-		if (groupStartUnit) {
-			assert(groupEndUnit);
+		if (groupUnits.StartUnit) {
+			assert(groupUnits.EndUnit);
 
-			if (groupStartUnit == groupEndUnit) {
+			if (groupUnits.StartUnit == groupUnits.EndUnit) {
 				// drag onto this same unit. no group shenanigans!
 				if (isForward) {
 					// forward drag, skip
-					Unit_SetRepeatMin(groupStartUnit, 0);
+					Unit_SetRepeatMin(groupUnits.StartUnit, 0);
 				} else {
 					// backward drag, repeat
-					Unit_SetRepeatMax(groupStartUnit, 0);
+					Unit_SetRepeatMax(groupUnits.StartUnit, 0);
 				}
 			} else {
-				int parent = groupStartUnit->Parent;
-				int startIndex = groupStartUnit->Index;
-				int endIndex = groupEndUnit->Index;
+				int parent = groupUnits.StartUnit->Parent;
+				int startIndex = groupUnits.StartUnit->Index;
+				int endIndex = groupUnits.EndUnit->Index;
 
-				Unit* newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
-
-				NoUnionEx* ex = newUnit->Contents->Group->Regex->UnionMembers[0];
-
-				for (Unit* currentUnit = groupStartUnit; currentUnit; currentUnit = Unit_Next(currentUnit)) {
-					NoUnionEx_AddUnit(ex, currentUnit, -1);
-
-					if (currentUnit == groupEndUnit) {
-						break;
-					}
-				}
+				Unit* newUnit = RangeToGroup(groupUnits);
 
 				if (isForward) {
 					Unit_SetRepeatMin(newUnit, 0);
@@ -761,18 +766,20 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 				&& !rect_contains(rect, drag.BoxSelect.Rect)
 			) {
 				PotentialSelect* potential = &drag.BoxSelect.Potentials[depth];
-				if (!potential->StartUnit) {
+				if (!potential->Range.StartUnit) {
 					// initialize a selection at this level
 					(*potential) = (PotentialSelect) {
 						.Valid = 1,
-						.StartUnit = unit,
-						.EndUnit = unit,
+						.Range = (UnitRange) {
+							.StartUnit = unit,
+							.EndUnit = unit,
+						},
 					};
 				} else {
 					// we already have a selection at this level;
 					// either continue it or destroy it
-					if (potential->EndUnit == Unit_Previous(unit)) {
-						potential->EndUnit = unit;
+					if (potential->Range.EndUnit == Unit_Previous(unit)) {
+						potential->Range.EndUnit = unit;
 					} else {
 						potential->Valid = 0;
 					}
@@ -888,27 +895,11 @@ int frame(float dt) {
 					COLOR_WIRE
 				);
 			} else if (drag.Type == DRAG_TYPE_BOX_SELECT) {
-				UnitSelection newSelection = {0};
+				UnitRange newSelection = {0};
 				for (int i = 0; i < MAX_POTENTIAL_SELECTS; i++) {
 					PotentialSelect* potential = &drag.BoxSelect.Potentials[i];
 					if (potential->Valid) {
-						newSelection.StartUnit = potential->StartUnit;
-
-						Unit* currentUnit = potential->StartUnit;
-						while (1) {
-							if (!currentUnit) {
-								break;
-							}
-
-							newSelection.Len++;
-
-							if (currentUnit == potential->EndUnit) {
-								break;
-							}
-
-							currentUnit = Unit_Next(currentUnit);
-						}
-
+						newSelection = potential->Range;
 						break;
 					}
 				}
@@ -955,6 +946,16 @@ int frame(float dt) {
 	}
 
 	if (mu_begin_window(ctx, "Tree View",mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 400))) {
+		if (selection.StartUnit && mu_button(ctx, "Make Group")) {
+			NoUnionEx* parent = selection.StartUnit->Parent;
+			int startIndex = selection.StartUnit->Index;
+			int endIndex = selection.EndUnit->Index;
+
+			Unit* newUnit = RangeToGroup(selection);
+
+			NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
+		}
+
 		doTree(ctx, regex);
 
 		mu_end_window(ctx);

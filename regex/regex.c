@@ -8,7 +8,7 @@ void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
     assert(ex->NumUnits < MAX_UNITS);
 
-    if (index == -1) {
+    if (index < 0) {
         ex->Units[ex->NumUnits] = unit;
         ex->NumUnits++;
         return;
@@ -100,19 +100,33 @@ int Unit_ShouldShowWires(Unit* unit) {
     return unit->IsHover || unit->IsWireDragOrigin || Unit_IsNonSingular(unit);
 }
 
-int Unit_ShouldShowHandles(Unit* unit) {
-    return Unit_ShouldShowWires(unit);
-}
-
 int Unit_ShouldShowLeftHandle(Unit* unit) {
-    return Unit_ShouldShowHandles(unit) && !Unit_Previous(unit);
+    if (Unit_Previous(unit)) {
+        return 0;
+    }
+
+    if (unit->IsSelected) {
+        return 1;
+    } else {
+        return Unit_ShouldShowWires(unit);
+    }
 }
 
 int Unit_ShouldShowRightHandle(Unit* unit) {
-    return (
-        Unit_ShouldShowHandles(unit)
-        || (Unit_Next(unit) && Unit_ShouldShowHandles(Unit_Next(unit)))
-    );
+    Unit* next = Unit_Next(unit);
+
+    if (!unit->IsSelected && (next && next->IsSelected)) {
+        return 1;
+    } else if (unit->IsSelected && !(next && next->IsSelected)) {
+        return 1;
+    } else if (!unit->IsSelected) {
+        return (
+            Unit_ShouldShowWires(unit)
+            || (Unit_Next(unit) && Unit_ShouldShowWires(Unit_Next(unit)))
+        );
+    }
+
+    return 0;
 }
 
 char* toString_Regex(char* base, Regex* regex);

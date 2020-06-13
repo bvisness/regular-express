@@ -77,6 +77,7 @@ typedef struct Unit {
 
     int IsHover;
     int IsWireDragOrigin;
+    int IsSelected;
 
     float LeftHandleZoneWidth;
     float RightHandleZoneWidth;
