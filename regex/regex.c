@@ -97,7 +97,7 @@ int Unit_IsRepeat(Unit* unit) {
 }
 
 int Unit_ShouldShowWires(Unit* unit) {
-    return unit->IsHover || unit->IsDragOrigin || Unit_IsNonSingular(unit);
+    return unit->IsHover || unit->IsWireDragOrigin || Unit_IsNonSingular(unit);
 }
 
 int Unit_ShouldShowHandles(Unit* unit) {

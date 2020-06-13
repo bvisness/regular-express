@@ -57,4 +57,29 @@ static inline float interp_linear(float dt, float current, float target, float r
     return result;
 }
 
+static inline mu_Rect rect_intersect(mu_Rect r1, mu_Rect r2) {
+    int x1 = imax(r1.x, r2.x);
+    int y1 = imax(r1.y, r2.y);
+    int x2 = imin(r1.x + r1.w, r2.x + r2.w);
+    int y2 = imin(r1.y + r1.h, r2.y + r2.h);
+    if (x2 < x1) { x2 = x1; }
+    if (y2 < y1) { y2 = y1; }
+    return mu_rect(x1, y1, x2 - x1, y2 - y1);
+}
+
+static inline int rect_contains(mu_Rect r1, mu_Rect r2) {
+    mu_Rect intersection = rect_intersect(r1, r2);
+    return (
+        intersection.x == r2.x
+        && intersection.y == r2.y
+        && intersection.w == r2.w
+        && intersection.h == r2.h
+    );
+}
+
+static inline int rect_overlaps(mu_Rect r1, mu_Rect r2) {
+    mu_Rect intersection = rect_intersect(r1, r2);
+    return (intersection.w && intersection.h);
+}
+
 #endif

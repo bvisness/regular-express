@@ -81,18 +81,55 @@ void draw_arbitrary_text(mu_Context* ctx, const char* str, mu_Vec2 pos, mu_Color
 // --------------------------------------------------------------------
 
 enum {
-	DRAG_START_LEFT_HANDLE,
-	DRAG_START_RIGHT_HANDLE
+	DRAG_WIRE_LEFT_HANDLE,
+	DRAG_WIRE_RIGHT_HANDLE
 };
 
-typedef struct DragContext {
-	Unit* OriginUnit;
+typedef struct UnitSelection {
+	Unit* StartUnit;
+	int Len;
+} UnitSelection;
 
+UnitSelection selection;
+
+enum {
+	DRAG_TYPE_NONE,
+	DRAG_TYPE_WIRE,
+	DRAG_TYPE_BOX_SELECT
+};
+
+typedef struct DragWire {
+	Unit* OriginUnit;
 	Unit* UnitBeforeHandle;
 	Unit* UnitAfterHandle;
 
+	Vec2i WireStartPos;
+	int WhichHandle;
+} DragWire;
+
+typedef struct PotentialSelect {
+	int Valid;
+	Unit* StartUnit;
+	Unit* EndUnit;
+} PotentialSelect;
+
+#define MAX_POTENTIAL_SELECTS 16
+
+typedef struct DragBoxSelect {
 	Vec2i StartPos;
-	int StartEntity;
+	mu_Rect Rect;
+
+	UnitSelection CurrentSelection;
+	PotentialSelect Potentials[MAX_POTENTIAL_SELECTS];
+} DragBoxSelect;
+
+typedef struct DragContext {
+	int Type;
+
+	union {
+		DragWire Wire;
+		DragBoxSelect BoxSelect;
+	};
 } DragContext;
 
 DragContext drag;
@@ -131,6 +168,7 @@ const int CURSOR_VERTICAL_PADDING = 2;
 const mu_Color COLOR_RE_TEXT = (mu_Color) { 0, 0, 0, 255 };
 const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
 const mu_Color COLOR_CURSOR = (mu_Color) { 45, 83, 252, 255 };
+const mu_Color COLOR_SELECTED_BACKGROUND = (mu_Color) { 122, 130, 255, 255 };
 
 void prepass_Regex(Regex* regex);
 void prepass_NoUnionEx(NoUnionEx* ex);
@@ -242,13 +280,13 @@ void prepass_Group(Group* group) {
 	group->WireHeight = GROUP_VERTICAL_PADDING + regex->WireHeight;
 }
 
-void drawRailroad_Regex(Regex* regex, Vec2i origin);
-void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin);
-void drawRailroad_Unit(Unit* unit, Vec2i origin);
-void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin);
-void drawRailroad_Group(Group* group, Vec2i origin);
+void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth);
+void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth);
+void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth);
+void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected);
+void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected);
 
-void drawRailroad_Regex(Regex* regex, Vec2i origin) {
+void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
 	Vec2i memberOrigin = (Vec2i) {
 		.x = origin.x + UNION_GUTTER_WIDTH,
 		.y = origin.y,
@@ -285,7 +323,7 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin) {
 	// union members
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
-		drawRailroad_NoUnionEx(member, memberOrigin);
+		drawRailroad_NoUnionEx(member, memberOrigin, unitDepth);
 
 		int memberWireY = memberOrigin.y + member->WireHeight - WIRE_THICKNESS/2;
 		mu_draw_rect(
@@ -336,31 +374,38 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin) {
 	);
 }
 
-void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin) {
+void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 	int unitX = origin.x;
 	for (int i = 0; i < ex->NumUnits; i++) {
 		Unit* unit = ex->Units[i];
-		drawRailroad_Unit(unit, (Vec2i) {
-			.x = unitX,
-			.y = origin.y + ex->WireHeight - unit->WireHeight,
-		});
+		drawRailroad_Unit(
+			unit,
+			(Vec2i) {
+				.x = unitX,
+				.y = origin.y + ex->WireHeight - unit->WireHeight,
+			},
+			unitDepth
+		);
 
 		unitX += unit->Size.w;
 	}
 }
 
-void drawRailroad_Unit(Unit* unit, Vec2i origin) {
+void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 	mu_Id muid = mu_get_id(ctx, &unit, sizeof(Unit*));
 
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
-	int isHover = mu_mouse_over(ctx, rect);
-	int isDragOrigin = (drag.OriginUnit == unit);
+	int isHover = !(drag.Type == DRAG_TYPE_BOX_SELECT) && mu_mouse_over(ctx, rect);
+	int isWireDragOrigin = (
+		drag.Type == DRAG_TYPE_WIRE
+		&& drag.Wire.OriginUnit == unit
+	);
 	int nonSingular = Unit_IsNonSingular(unit);
 
 	// save some of 'em for the next pass
 	unit->LastRect = rect;
 	unit->IsHover = isHover;
-	unit->IsDragOrigin = isDragOrigin;
+	unit->IsWireDragOrigin = isWireDragOrigin;
 
 	mu_push_clip_rect(ctx, rect);
 
@@ -485,16 +530,33 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		);
 	}
 
+	int selected = 0;
+	{
+		Unit* currentUnit = selection.StartUnit;
+		for (int i = 0; i < selection.Len; i++) {
+			if (currentUnit == unit) {
+				selected = 1;
+				break;
+			}
+			currentUnit = Unit_Next(currentUnit);
+		}
+	}
+
 	mu_Rect contentsRect = mu_rect(
 		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
 		origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
 		unit->Contents->Size.w,
 		unit->Contents->Size.h
 	);
-	drawRailroad_UnitContents(unit->Contents, (Vec2i) {
-		.x = contentsRect.x,
-		.y = contentsRect.y,
-	});
+	drawRailroad_UnitContents(
+		unit->Contents,
+		(Vec2i) {
+			.x = contentsRect.x,
+			.y = contentsRect.y,
+		},
+		depth,
+		selected
+	);
 
 	if (ctx->focus == muid) {
 		ctx->updated_focus = 1;
@@ -565,25 +627,36 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 			mu_set_focus(ctx, muid);
 		}
 
-		if (!drag.OriginUnit) {
+		if (!drag.Type) {
 			// maybe start drag
 			if (overLeftHandle) {
 				drag = (DragContext) {
-					.OriginUnit = unit,
-					.UnitBeforeHandle = Unit_Previous(unit),
-					.UnitAfterHandle = unit,
-					.StartEntity = DRAG_START_LEFT_HANDLE,
+					.Type = DRAG_TYPE_WIRE,
+					.Wire = (DragWire) {
+						.OriginUnit = unit,
+						.UnitBeforeHandle = Unit_Previous(unit),
+						.UnitAfterHandle = unit,
+						.WhichHandle = DRAG_WIRE_LEFT_HANDLE,
+					},
 				};
 			} else if (overRightHandle) {
 				drag = (DragContext) {
-					.OriginUnit = unit,
-					.UnitBeforeHandle = unit,
-					.UnitAfterHandle = Unit_Next(unit),
-					.StartEntity = DRAG_START_RIGHT_HANDLE,
+					.Type = DRAG_TYPE_WIRE,
+					.Wire = (DragWire) {
+						.OriginUnit = unit,
+						.UnitBeforeHandle = unit,
+						.UnitAfterHandle = Unit_Next(unit),
+						.WhichHandle = DRAG_WIRE_RIGHT_HANDLE,
+					},
 				};
 			}
+
+			if (drag.Type) {
+				// consume the mouse input so no other drags start
+				ctx->mouse_pressed &= ~MU_MOUSE_LEFT;
+			}
 		}
-	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.OriginUnit) {
+	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.Type == DRAG_TYPE_WIRE) {
 		// drag finished
 		ctx->animating = 1;
 
@@ -593,9 +666,9 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		int isForward = 0; // vs. backward
 
 		// seek left from the drag origin to find repetition
-		if (drag.UnitBeforeHandle) {
-			NoUnionEx* ex = drag.UnitBeforeHandle->Parent;
-			for (int i = drag.UnitBeforeHandle->Index; i >= 0; i--) {
+		if (drag.Wire.UnitBeforeHandle) {
+			NoUnionEx* ex = drag.Wire.UnitBeforeHandle->Parent;
+			for (int i = drag.Wire.UnitBeforeHandle->Index; i >= 0; i--) {
 				Unit* visitingUnit = ex->Units[i];
 
 				if (
@@ -603,7 +676,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 					|| (Unit_Next(unit) == visitingUnit && overRightHandle)
 				) {
 					groupStartUnit = visitingUnit;
-					groupEndUnit = drag.UnitBeforeHandle;
+					groupEndUnit = drag.Wire.UnitBeforeHandle;
 					isForward = 0;
 					break;
 				}
@@ -611,16 +684,16 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		}
 
 		// seek right from the drag origin to find skips
-		if (drag.UnitAfterHandle) {
-			NoUnionEx* ex = drag.UnitAfterHandle->Parent;
-			for (int i = drag.UnitAfterHandle->Index; i < ex->NumUnits; i++) {
+		if (drag.Wire.UnitAfterHandle) {
+			NoUnionEx* ex = drag.Wire.UnitAfterHandle->Parent;
+			for (int i = drag.Wire.UnitAfterHandle->Index; i < ex->NumUnits; i++) {
 				Unit* visitingUnit = ex->Units[i];
 
 				if (
 					(unit == visitingUnit && overRightHandle)
 					|| (Unit_Previous(unit) == visitingUnit && overLeftHandle)
 				) {
-					groupStartUnit = drag.UnitAfterHandle;
+					groupStartUnit = drag.Wire.UnitAfterHandle;
 					groupEndUnit = visitingUnit;
 					isForward = 1;
 					break;
@@ -669,43 +742,62 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin) {
 		}
 	}
 
-	if (ctx->mouse_down & MU_MOUSE_LEFT && drag.OriginUnit == unit) {
-		if (drag.StartEntity == DRAG_START_LEFT_HANDLE) {
-			drag.StartPos = (Vec2i) {
-				.x = leftHandleRect.x + leftHandleRect.w/2,
-				.y = leftHandleRect.y + leftHandleRect.h/2,
-			};
-		} else if (drag.StartEntity == DRAG_START_RIGHT_HANDLE) {
-			drag.StartPos = (Vec2i) {
-				.x = rightHandleRect.x + rightHandleRect.w/2,
-				.y = rightHandleRect.y + rightHandleRect.h/2,
-			};
+	if (ctx->mouse_down & MU_MOUSE_LEFT && drag.Type) {
+		if (drag.Type == DRAG_TYPE_WIRE && drag.Wire.OriginUnit == unit) {
+			if (drag.Wire.WhichHandle == DRAG_WIRE_LEFT_HANDLE) {
+				drag.Wire.WireStartPos = (Vec2i) {
+					.x = leftHandleRect.x + leftHandleRect.w/2,
+					.y = leftHandleRect.y + leftHandleRect.h/2,
+				};
+			} else if (drag.Wire.WhichHandle == DRAG_WIRE_RIGHT_HANDLE) {
+				drag.Wire.WireStartPos = (Vec2i) {
+					.x = rightHandleRect.x + rightHandleRect.w/2,
+					.y = rightHandleRect.y + rightHandleRect.h/2,
+				};
+			}
+		} else if (drag.Type == DRAG_TYPE_BOX_SELECT) {
+			if (
+				rect_overlaps(rect, drag.BoxSelect.Rect)
+				&& !rect_contains(rect, drag.BoxSelect.Rect)
+			) {
+				PotentialSelect* potential = &drag.BoxSelect.Potentials[depth];
+				if (!potential->StartUnit) {
+					// initialize a selection at this level
+					(*potential) = (PotentialSelect) {
+						.Valid = 1,
+						.StartUnit = unit,
+						.EndUnit = unit,
+					};
+				} else {
+					// we already have a selection at this level;
+					// either continue it or destroy it
+					if (potential->EndUnit == Unit_Previous(unit)) {
+						potential->EndUnit = unit;
+					} else {
+						potential->Valid = 0;
+					}
+				}
+			}
 		}
 	}
 }
 
-void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
+void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected) {
 	mu_Rect r = mu_rect(origin.x, origin.y, contents->Size.w, contents->Size.h);
+
+	mu_Color backgroundColor = selected ? COLOR_SELECTED_BACKGROUND : mu_color(200, 200, 200, 255);
 
 	mu_layout_set_next(ctx, r, 0);
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
-			mu_draw_rect(
-				ctx,
-				r,
-				mu_color(200, 200, 200, 255)
-			);
+			mu_draw_rect(ctx, r, backgroundColor);
 
 			char* str = contents->LitChar->_buf;
 			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_METACHAR: {
-			mu_draw_rect(
-				ctx,
-				r,
-				mu_color(200, 200, 200, 255)
-			);
+			mu_draw_rect(ctx, r, backgroundColor);
 
 			char* str = &contents->MetaChar->_backslash;
 			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
@@ -713,37 +805,33 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin) {
 		} break;
 		case RE_CONTENTS_SPECIAL: {
 			// TODO: DO IT
-			mu_draw_rect(
-				ctx,
-				r,
-				mu_color(200, 200, 200, 255)
-			);
+			mu_draw_rect(ctx, r, backgroundColor);
 		} break;
 		case RE_CONTENTS_SET: {
 			// TODO: Set
-			mu_draw_rect(
-				ctx,
-				r,
-				mu_color(200, 200, 200, 255)
-			);
+			mu_draw_rect(ctx, r, backgroundColor);
 		} break;
 		case RE_CONTENTS_GROUP: {
-			drawRailroad_Group(contents->Group, origin);
+			drawRailroad_Group(contents->Group, origin, unitDepth, selected);
 		} break;
 	}
 }
 
-void drawRailroad_Group(Group* group, Vec2i origin) {
+void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected) {
 	mu_draw_rect(
 		ctx,
 		mu_rect(origin.x, origin.y, group->Size.w, group->Size.h),
-		mu_color(0, 0, 0, 25)
+		selected ? COLOR_SELECTED_BACKGROUND : mu_color(0, 0, 0, 25)
 	);
 
-	drawRailroad_Regex(group->Regex, (Vec2i) {
-		.x = origin.x,
-		.y = GROUP_VERTICAL_PADDING + origin.y,
-	});
+	drawRailroad_Regex(
+		group->Regex,
+		(Vec2i) {
+			.x = origin.x,
+			.y = GROUP_VERTICAL_PADDING + origin.y,
+		},
+		unitDepth + 1
+	);
 }
 
 int frame(float dt) {
@@ -755,45 +843,105 @@ int frame(float dt) {
 
 	prepass_Regex(regex);
 	if (mu_begin_window_ex(ctx, "Test", mu_rect(WINDOW_PADDING, WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, GUI_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
-		drawRailroad_Regex(regex, (Vec2i) {
-			.x = PAGE_WIDTH/2 - regex->Size.x/2,
-			.y = WINDOW_PADDING + GUI_HEIGHT/2 - regex->Size.y/2,
-		});
+		drawRailroad_Regex(
+			regex,
+			(Vec2i) {
+				.x = PAGE_WIDTH/2 - regex->Size.x/2,
+				.y = WINDOW_PADDING + GUI_HEIGHT/2 - regex->Size.y/2,
+			},
+			0
+		);
 
-		if (drag.OriginUnit) {
-			// draw preview
-			int offsetX = ctx->mouse_pos.x - drag.StartPos.x;
-			int previewY = drag.StartPos.y - iclamp(1/1.618f * offsetX, -40, 40);
-			mu_draw_rect(
-				ctx,
-				mu_rect(
-					imin(ctx->mouse_pos.x, drag.StartPos.x) - WIRE_THICKNESS/2,
-					previewY - WIRE_THICKNESS/2,
-					WIRE_THICKNESS/2 + iabs(offsetX) + WIRE_THICKNESS/2,
-					WIRE_THICKNESS
-				),
-				COLOR_WIRE
-			);
-			mu_draw_rect(
-				ctx,
-				mu_rect(
-					drag.StartPos.x - WIRE_THICKNESS/2,
-					imin(previewY, drag.StartPos.y) - WIRE_THICKNESS/2,
-					WIRE_THICKNESS,
-					WIRE_THICKNESS/2 + iabs(previewY - drag.StartPos.y) + WIRE_THICKNESS/2
-				),
-				COLOR_WIRE
-			);
-			mu_draw_rect(
-				ctx,
-				mu_rect(
-					ctx->mouse_pos.x - WIRE_THICKNESS/2,
-					imin(previewY, ctx->mouse_pos.y) - WIRE_THICKNESS/2,
-					WIRE_THICKNESS,
-					WIRE_THICKNESS/2 + iabs(previewY - ctx->mouse_pos.y) + WIRE_THICKNESS/2
-				),
-				COLOR_WIRE
-			);
+		if (ctx->mouse_down & MU_MOUSE_LEFT) {
+			if (drag.Type == DRAG_TYPE_WIRE) {
+				// draw preview
+				int offsetX = ctx->mouse_pos.x - drag.Wire.WireStartPos.x;
+				int previewY = drag.Wire.WireStartPos.y - iclamp(1/1.618f * offsetX, -40, 40);
+				mu_draw_rect(
+					ctx,
+					mu_rect(
+						imin(ctx->mouse_pos.x, drag.Wire.WireStartPos.x) - WIRE_THICKNESS/2,
+						previewY - WIRE_THICKNESS/2,
+						WIRE_THICKNESS/2 + iabs(offsetX) + WIRE_THICKNESS/2,
+						WIRE_THICKNESS
+					),
+					COLOR_WIRE
+				);
+				mu_draw_rect(
+					ctx,
+					mu_rect(
+						drag.Wire.WireStartPos.x - WIRE_THICKNESS/2,
+						imin(previewY, drag.Wire.WireStartPos.y) - WIRE_THICKNESS/2,
+						WIRE_THICKNESS,
+						WIRE_THICKNESS/2 + iabs(previewY - drag.Wire.WireStartPos.y) + WIRE_THICKNESS/2
+					),
+					COLOR_WIRE
+				);
+				mu_draw_rect(
+					ctx,
+					mu_rect(
+						ctx->mouse_pos.x - WIRE_THICKNESS/2,
+						imin(previewY, ctx->mouse_pos.y) - WIRE_THICKNESS/2,
+						WIRE_THICKNESS,
+						WIRE_THICKNESS/2 + iabs(previewY - ctx->mouse_pos.y) + WIRE_THICKNESS/2
+					),
+					COLOR_WIRE
+				);
+			} else if (drag.Type == DRAG_TYPE_BOX_SELECT) {
+				UnitSelection newSelection = {0};
+				for (int i = 0; i < MAX_POTENTIAL_SELECTS; i++) {
+					PotentialSelect* potential = &drag.BoxSelect.Potentials[i];
+					if (potential->Valid) {
+						newSelection.StartUnit = potential->StartUnit;
+
+						Unit* currentUnit = potential->StartUnit;
+						while (1) {
+							if (!currentUnit) {
+								break;
+							}
+
+							newSelection.Len++;
+
+							if (currentUnit == potential->EndUnit) {
+								break;
+							}
+
+							currentUnit = Unit_Next(currentUnit);
+						}
+
+						break;
+					}
+				}
+
+				selection = newSelection;
+				for (int i = 0; i < MAX_POTENTIAL_SELECTS; i++) {
+					drag.BoxSelect.Potentials[i] = (PotentialSelect) {0};
+				}
+
+				// update select rect for next frame
+				drag.BoxSelect.Rect = mu_rect(
+					imin(ctx->mouse_pos.x, drag.BoxSelect.StartPos.x),
+					imin(ctx->mouse_pos.y, drag.BoxSelect.StartPos.y),
+					iabs(ctx->mouse_pos.x - drag.BoxSelect.StartPos.x),
+					iabs(ctx->mouse_pos.y - drag.BoxSelect.StartPos.y)
+				);
+
+				mu_draw_rect(
+					ctx,
+					drag.BoxSelect.Rect,
+					mu_color(14, 108, 255, 76)
+				);
+			}
+		}
+
+		if (ctx->mouse_pressed & MU_MOUSE_LEFT) {
+			// nothing else consumed the mouse click, so start a box select
+			drag = (DragContext) {
+				.Type = DRAG_TYPE_BOX_SELECT,
+				.BoxSelect = (DragBoxSelect) {
+					.StartPos = (Vec2i) { .x = ctx->mouse_pos.x, .y = ctx->mouse_pos.y },
+				},
+			};
 		}
 
 		mu_end_window(ctx);
@@ -812,13 +960,9 @@ int frame(float dt) {
 		mu_end_window(ctx);
 	}
 
-	// reset drag
+	// mouse up; end all drags
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
-		drag = (DragContext) {
-			.OriginUnit = NULL,
-			.UnitBeforeHandle = NULL,
-			.UnitAfterHandle = NULL,
-		};
+		drag = (DragContext) {0};
 	}
 
 	mu_end(ctx);
