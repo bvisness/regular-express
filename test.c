@@ -92,16 +92,17 @@ typedef struct UnitRange {
 
 UnitRange selection;
 
-#define ITER_UnitRange(range, it) for ( 						\
-	Unit *(it) = (range).StartUnit; 							\
-	(it); 														\
-	(it) = ((it) == (range).EndUnit) ? NULL : Unit_Next(it) 	\
+#define ITER_UnitRange(range, it) for ( 										\
+	Unit *(it) = (range).StartUnit, *__next = Unit_Next((range).StartUnit); 	\
+	(it); 																		\
+	(it) = ((it) == (range).EndUnit) ? NULL : __next, __next = Unit_Next(it) 	\
 )
 
 enum {
 	DRAG_TYPE_NONE,
 	DRAG_TYPE_WIRE,
-	DRAG_TYPE_BOX_SELECT
+	DRAG_TYPE_BOX_SELECT,
+	DRAG_TYPE_MOVE_UNITS,
 };
 
 typedef struct DragWire {
@@ -128,12 +129,20 @@ typedef struct DragBoxSelect {
 	PotentialSelect Potentials[MAX_POTENTIAL_SELECTS];
 } DragBoxSelect;
 
+typedef struct DragMoveUnits {
+	NoUnionEx* OriginEx;
+	int OriginIndex;
+} DragMoveUnits;
+
+NoUnionEx moveUnitsEx;
+
 typedef struct DragContext {
 	int Type;
 
 	union {
 		DragWire Wire;
 		DragBoxSelect BoxSelect;
+		DragMoveUnits MoveUnits;
 	};
 } DragContext;
 
@@ -151,6 +160,13 @@ Unit* RangeToGroup(UnitRange range) {
 	}
 
 	return newUnit;
+}
+
+void moveUnitsTo(NoUnionEx* ex, int index) {
+	while (moveUnitsEx.NumUnits > 0) {
+		NoUnionEx_AddUnit(ex, moveUnitsEx.Units[moveUnitsEx.NumUnits-1], index);
+		NoUnionEx_RemoveUnit(&moveUnitsEx, -1);
+	}
 }
 
 Regex* regex;
@@ -639,12 +655,27 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 	unit->RightHandleZoneWidth = interp_linear(ctx->dt, unit->RightHandleZoneWidth, targetRightHandleZoneWidth, 160, &animating);
 	ctx->animating |= animating;
 
-	if (ctx->mouse_pressed == MU_MOUSE_LEFT) {
+	mu_Rect leftHandleZoneRect = mu_rect(
+		rect.x,
+		rect.y,
+		unit->LeftHandleZoneWidth,
+		rect.h
+	);
+	mu_Rect rightHandleZoneRect = mu_rect(
+		contentsRect.x + contentsRect.w,
+		rect.y,
+		unit->RightHandleZoneWidth,
+		rect.h
+	);
+
+	if (ctx->mouse_released & MU_MOUSE_LEFT) {
 		if (mu_mouse_over(ctx, contentsRect) && unit->Contents->Type == RE_CONTENTS_LITCHAR) {
 			mu_set_focus(ctx, muid);
 		}
+	}
 
-		if (!drag.Type) {
+	if (ctx->mouse_down == MU_MOUSE_LEFT) {
+		if (!drag.Type && ctx->mouse_started_drag) {
 			// maybe start drag
 			if (overLeftHandle) {
 				drag = (DragContext) {
@@ -666,6 +697,37 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 						.WhichHandle = DRAG_WIRE_RIGHT_HANDLE,
 					},
 				};
+			} else if (mu_mouse_over(ctx, contentsRect)) {
+				moveUnitsEx = (NoUnionEx) {0};
+
+				int numUnits = 1;
+				Unit* startUnit = unit;
+
+				if (selection.StartUnit && isSelected) {
+					startUnit = selection.StartUnit;
+					numUnits = 0;
+					ITER_UnitRange(selection, it) {
+						numUnits++;
+					}
+				}
+
+				NoUnionEx* originEx = startUnit->Parent;
+				int originIndex = startUnit->Index;
+
+				for (int i = 0; i < numUnits; i++) {
+					Unit* addedUnit = originEx->Units[originIndex];
+					NoUnionEx_AddUnit(&moveUnitsEx, addedUnit, -1);
+					Unit* removedUnit = NoUnionEx_RemoveUnit(originEx, originIndex);
+					assert(addedUnit == removedUnit)
+				}
+
+				drag = (DragContext) {
+					.Type = DRAG_TYPE_MOVE_UNITS,
+					.MoveUnits = (DragMoveUnits) {
+						.OriginEx = originEx,
+						.OriginIndex = originIndex,
+					},
+				};
 			}
 
 			if (drag.Type) {
@@ -673,77 +735,95 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 				ctx->mouse_pressed &= ~MU_MOUSE_LEFT;
 			}
 		}
-	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.Type == DRAG_TYPE_WIRE) {
-		// drag finished
-		ctx->animating = 1;
+	} else if (!(ctx->mouse_down & MU_MOUSE_LEFT) && drag.Type) {
+		int didHandleDrag = 0;
 
-		// seek back and forth to figure out what the heck kind of drag this is
-		UnitRange groupUnits = {0};
-		int isForward = 0; // vs. backward
+		if (drag.Type == DRAG_TYPE_WIRE) {
+			// drag finished
+			ctx->animating = 1;
 
-		// seek left from the drag origin to find repetition
-		if (drag.Wire.UnitBeforeHandle) {
-			NoUnionEx* ex = drag.Wire.UnitBeforeHandle->Parent;
-			for (int i = drag.Wire.UnitBeforeHandle->Index; i >= 0; i--) {
-				Unit* visitingUnit = ex->Units[i];
+			// seek back and forth to figure out what the heck kind of drag this is
+			UnitRange groupUnits = {0};
+			int isForward = 0; // vs. backward
 
-				if (
-					(unit == visitingUnit && overLeftHandle)
-					|| (Unit_Next(unit) == visitingUnit && overRightHandle)
-				) {
-					groupUnits.StartUnit = visitingUnit;
-					groupUnits.EndUnit = drag.Wire.UnitBeforeHandle;
-					isForward = 0;
-					break;
+			// seek left from the drag origin to find repetition
+			if (drag.Wire.UnitBeforeHandle) {
+				NoUnionEx* ex = drag.Wire.UnitBeforeHandle->Parent;
+				for (int i = drag.Wire.UnitBeforeHandle->Index; i >= 0; i--) {
+					Unit* visitingUnit = ex->Units[i];
+
+					if (
+						(unit == visitingUnit && overLeftHandle)
+						|| (Unit_Next(unit) == visitingUnit && overRightHandle)
+					) {
+						groupUnits.StartUnit = visitingUnit;
+						groupUnits.EndUnit = drag.Wire.UnitBeforeHandle;
+						isForward = 0;
+						break;
+					}
 				}
+			}
+
+			// seek right from the drag origin to find skips
+			if (drag.Wire.UnitAfterHandle) {
+				NoUnionEx* ex = drag.Wire.UnitAfterHandle->Parent;
+				for (int i = drag.Wire.UnitAfterHandle->Index; i < ex->NumUnits; i++) {
+					Unit* visitingUnit = ex->Units[i];
+
+					if (
+						(unit == visitingUnit && overRightHandle)
+						|| (Unit_Previous(unit) == visitingUnit && overLeftHandle)
+					) {
+						groupUnits.StartUnit = drag.Wire.UnitAfterHandle;
+						groupUnits.EndUnit = visitingUnit;
+						isForward = 1;
+						break;
+					}
+				}
+			}
+
+			if (groupUnits.StartUnit) {
+				assert(groupUnits.EndUnit);
+
+				didHandleDrag = 1;
+
+				if (groupUnits.StartUnit == groupUnits.EndUnit) {
+					// drag onto this same unit. no group shenanigans!
+					if (isForward) {
+						// forward drag, skip
+						Unit_SetRepeatMin(groupUnits.StartUnit, 0);
+					} else {
+						// backward drag, repeat
+						Unit_SetRepeatMax(groupUnits.StartUnit, 0);
+					}
+				} else {
+					int parent = groupUnits.StartUnit->Parent;
+					int startIndex = groupUnits.StartUnit->Index;
+					int endIndex = groupUnits.EndUnit->Index;
+
+					Unit* newUnit = RangeToGroup(groupUnits);
+
+					if (isForward) {
+						Unit_SetRepeatMin(newUnit, 0);
+					} else {
+						Unit_SetRepeatMax(newUnit, 0);
+					}
+
+					NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
+				}
+			}
+		} else if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
+			if (mu_mouse_over(ctx, leftHandleZoneRect)) {
+				didHandleDrag = 1;
+				moveUnitsTo(unit->Parent, unit->Index);
+			} else if (mu_mouse_over(ctx, rightHandleZoneRect)) {
+				didHandleDrag = 1;
+				moveUnitsTo(unit->Parent, unit->Index+1);
 			}
 		}
 
-		// seek right from the drag origin to find skips
-		if (drag.Wire.UnitAfterHandle) {
-			NoUnionEx* ex = drag.Wire.UnitAfterHandle->Parent;
-			for (int i = drag.Wire.UnitAfterHandle->Index; i < ex->NumUnits; i++) {
-				Unit* visitingUnit = ex->Units[i];
-
-				if (
-					(unit == visitingUnit && overRightHandle)
-					|| (Unit_Previous(unit) == visitingUnit && overLeftHandle)
-				) {
-					groupUnits.StartUnit = drag.Wire.UnitAfterHandle;
-					groupUnits.EndUnit = visitingUnit;
-					isForward = 1;
-					break;
-				}
-			}
-		}
-
-		if (groupUnits.StartUnit) {
-			assert(groupUnits.EndUnit);
-
-			if (groupUnits.StartUnit == groupUnits.EndUnit) {
-				// drag onto this same unit. no group shenanigans!
-				if (isForward) {
-					// forward drag, skip
-					Unit_SetRepeatMin(groupUnits.StartUnit, 0);
-				} else {
-					// backward drag, repeat
-					Unit_SetRepeatMax(groupUnits.StartUnit, 0);
-				}
-			} else {
-				int parent = groupUnits.StartUnit->Parent;
-				int startIndex = groupUnits.StartUnit->Index;
-				int endIndex = groupUnits.EndUnit->Index;
-
-				Unit* newUnit = RangeToGroup(groupUnits);
-
-				if (isForward) {
-					Unit_SetRepeatMin(newUnit, 0);
-				} else {
-					Unit_SetRepeatMax(newUnit, 0);
-				}
-
-				NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
-			}
+		if (didHandleDrag) {
+			drag = (DragContext) {0};
 		}
 	}
 
@@ -849,6 +929,8 @@ int frame(float dt) {
 	const int GUI_HEIGHT = 300;
 
 	prepass_Regex(regex);
+	prepass_NoUnionEx(&moveUnitsEx);
+
 	if (mu_begin_window_ex(ctx, "Test", mu_rect(WINDOW_PADDING, WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, GUI_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(
 			regex,
@@ -922,15 +1004,17 @@ int frame(float dt) {
 					drag.BoxSelect.Rect,
 					mu_color(14, 108, 255, 76)
 				);
+			} else if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
+				drawRailroad_NoUnionEx(&moveUnitsEx, (Vec2i) { .x = ctx->mouse_pos.x, .y = ctx->mouse_pos.y }, 0);
 			}
 		}
 
-		if (ctx->mouse_pressed & MU_MOUSE_LEFT) {
+		if (ctx->mouse_down & MU_MOUSE_LEFT && ctx->mouse_started_drag && !drag.Type) {
 			// nothing else consumed the mouse click, so start a box select
 			drag = (DragContext) {
 				.Type = DRAG_TYPE_BOX_SELECT,
 				.BoxSelect = (DragBoxSelect) {
-					.StartPos = (Vec2i) { .x = ctx->mouse_pos.x, .y = ctx->mouse_pos.y },
+					.StartPos = (Vec2i) { .x = ctx->mouse_down_pos.x, .y = ctx->mouse_down_pos.y },
 				},
 			};
 		}
@@ -945,7 +1029,7 @@ int frame(float dt) {
 		mu_end_window(ctx);
 	}
 
-	if (mu_begin_window(ctx, "Tree View",mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 400))) {
+	if (mu_begin_window(ctx, "Tree View", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 400))) {
 		if (selection.StartUnit && mu_button(ctx, "Make Group")) {
 			NoUnionEx* parent = selection.StartUnit->Parent;
 			int startIndex = selection.StartUnit->Index;
@@ -963,6 +1047,10 @@ int frame(float dt) {
 
 	// mouse up; end all drags
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
+		if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
+			moveUnitsTo(drag.MoveUnits.OriginEx, drag.MoveUnits.OriginIndex);
+		}
+
 		drag = (DragContext) {0};
 	}
 

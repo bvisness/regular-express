@@ -8,10 +8,16 @@ void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
     assert(ex->NumUnits < MAX_UNITS);
 
+    unit->Parent = ex;
+    unit->Index = index;
+
     if (index < 0) {
         ex->Units[ex->NumUnits] = unit;
         ex->NumUnits++;
-        return;
+
+        unit->Index = ex->NumUnits-1;
+
+        goto checkAndReturn;
     }
 
     // shift units over
@@ -20,11 +26,11 @@ void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
         ex->Units[i + 1]->Index = i + 1;
     }
 
-    unit->Parent = ex;
-    unit->Index = index;
-
     ex->Units[index] = unit;
     ex->NumUnits++;
+
+checkAndReturn:
+    assert(unit->Parent == ex);
 }
 
 Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index) {
@@ -41,6 +47,7 @@ Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index) {
     ex->NumUnits--;
     for (int i = index; i < ex->NumUnits; i++) {
         ex->Units[i] = ex->Units[i + 1];
+        ex->Units[i]->Index = i;
     }
 
     return unit;
@@ -71,7 +78,10 @@ Unit* Unit_Next(Unit* unit) {
         return NULL;
     }
 
-    return unit->Parent->Units[unit->Index + 1];
+    Unit* next = unit->Parent->Units[unit->Index + 1];
+    assert(unit->Parent == next->Parent);
+
+    return next;
 }
 
 void Unit_SetRepeatMin(Unit* unit, int val) {

@@ -44,7 +44,7 @@
 
 			window.mem = mem;
 
-			function findNonZero(mem) {
+			window.findNonZero = mem => {
 				let currentSection = [];
 				const buf = new Uint8Array(mem.buffer)
 

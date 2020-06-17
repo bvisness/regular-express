@@ -24,6 +24,8 @@
 #define MU_SLIDER_FMT           "%.2f"
 #define MU_MAX_FMT              127
 
+#define MU_DRAG_THRESHOLD 3
+
 #define mu_stack(T, n)          struct { int idx; T items[n]; }
 #define mu_min(a, b)            ((a) < (b) ? (a) : (b))
 #define mu_max(a, b)            ((a) > (b) ? (a) : (b))
@@ -220,10 +222,14 @@ struct mu_Context {
   /* input state */
   mu_Vec2 mouse_pos;
   mu_Vec2 last_mouse_pos;
+  mu_Vec2 mouse_down_pos;
   mu_Vec2 mouse_delta;
   mu_Vec2 scroll_delta;
   int mouse_down;
   int mouse_pressed;
+  int mouse_released;
+  int mouse_started_drag;
+  int mouse_is_dragging;
   int key_down;
   int key_pressed;
   char input_text[32];

@@ -186,6 +186,8 @@ void mu_end(mu_Context *ctx) {
   ctx->key_pressed = 0;
   ctx->input_text[0] = '\0';
   ctx->mouse_pressed = 0;
+  ctx->mouse_released = 0;
+  ctx->mouse_started_drag = 0;
   ctx->scroll_delta = mu_vec2(0, 0);
   ctx->last_mouse_pos = ctx->mouse_pos;
 
@@ -382,11 +384,28 @@ void mu_pool_update(mu_Context *ctx, mu_PoolItem *items, int idx) {
 
 void mu_input_mousemove(mu_Context *ctx, int x, int y) {
   ctx->mouse_pos = mu_vec2(x, y);
+
+  if (ctx->mouse_down && !ctx->mouse_is_dragging) {
+    int outsideDragThreshold = (
+      ctx->mouse_pos.x < ctx->mouse_down_pos.x - MU_DRAG_THRESHOLD || ctx->mouse_down_pos.x + MU_DRAG_THRESHOLD < ctx->mouse_pos.x
+      || ctx->mouse_pos.y < ctx->mouse_down_pos.y - MU_DRAG_THRESHOLD || ctx->mouse_down_pos.y + MU_DRAG_THRESHOLD < ctx->mouse_pos.y
+    );
+
+    if (outsideDragThreshold) {
+      ctx->mouse_started_drag = 1;
+      ctx->mouse_is_dragging = 1;
+    }
+  }
 }
 
 
 void mu_input_mousedown(mu_Context *ctx, int x, int y, int btn) {
   mu_input_mousemove(ctx, x, y);
+
+  if (!ctx->mouse_down) {
+    ctx->mouse_down_pos = mu_vec2(x, y);
+  }
+
   ctx->mouse_down |= btn;
   ctx->mouse_pressed |= btn;
 }
@@ -395,6 +414,12 @@ void mu_input_mousedown(mu_Context *ctx, int x, int y, int btn) {
 void mu_input_mouseup(mu_Context *ctx, int x, int y, int btn) {
   mu_input_mousemove(ctx, x, y);
   ctx->mouse_down &= ~btn;
+  ctx->mouse_released |= btn;
+
+  if (!ctx->mouse_down) {
+    ctx->mouse_down_pos = mu_vec2(0, 0);
+    ctx->mouse_is_dragging = 0;
+  }
 }
 
 
@@ -692,8 +717,13 @@ void mu_draw_control_text(mu_Context *ctx, const char *str, mu_Rect rect,
 
 
 int mu_mouse_over(mu_Context *ctx, mu_Rect rect) {
-  return rect_overlaps_vec2(rect, ctx->mouse_pos) &&
-    rect_overlaps_vec2(mu_get_clip_rect(ctx), ctx->mouse_pos) &&
+  mu_Vec2 pos = ctx->mouse_pos;
+  if (ctx->mouse_down && (!ctx->mouse_is_dragging || ctx->mouse_started_drag)) {
+    pos = ctx->mouse_down_pos;
+  }
+
+  return rect_overlaps_vec2(rect, pos) &&
+    rect_overlaps_vec2(mu_get_clip_rect(ctx), pos) &&
     in_hover_root(ctx);
 }
 
