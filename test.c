@@ -227,6 +227,15 @@ void prepass_Regex(Regex* regex) {
 	int h = 0;
 	int wireHeight = 0;
 
+	// delete any empty expressions (after the first one)
+	for (int i = regex->NumUnionMembers-1; i >= 0; i--) {
+		NoUnionEx* member = regex->UnionMembers[i];
+		if (member->NumUnits == 0 && regex->NumUnionMembers > 1) {
+			Regex_RemoveUnionMember(regex, i);
+			// TODO: Free the deleted expression?
+		}
+	}
+
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
 		prepass_NoUnionEx(member);
@@ -245,7 +254,7 @@ void prepass_Regex(Regex* regex) {
 	};
 	regex->Size = (Vec2i) {
 		.w = UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH,
-		.h = regex->UnionSize.h,
+		.h = regex->UnionSize.h + 30,
 	};
 	regex->WireHeight = wireHeight;
 }
@@ -333,6 +342,8 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected);
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
+	mu_push_id(ctx, &regex, sizeof(Regex*));
+
 	Vec2i memberOrigin = (Vec2i) {
 		.x = origin.x + UNION_GUTTER_WIDTH,
 		.y = origin.y,
@@ -418,6 +429,18 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
 		),
 		COLOR_WIRE
 	);
+
+	const int PLUS_BUTTON_WIDTH = 30;
+	mu_layout_set_next(ctx, mu_rect(origin.x + regex->Size.x/2 - PLUS_BUTTON_WIDTH/2, memberOrigin.y, PLUS_BUTTON_WIDTH, 20), 0);
+	if (mu_button(ctx, "+")) {
+		NoUnionEx* newMember = NoUnionEx_init(RE_NEW(NoUnionEx));
+		Regex_AddUnionMember(regex, newMember);
+
+		Unit* initialUnit = Unit_init(RE_NEW(Unit));
+		NoUnionEx_AddUnit(newMember, initialUnit, -1);
+	}
+
+	mu_pop_id(ctx);
 }
 
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {

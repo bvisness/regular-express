@@ -5,6 +5,15 @@ void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
     regex->NumUnionMembers++;
 }
 
+void Regex_RemoveUnionMember(Regex* regex, int index) {
+    regex->NumUnionMembers--;
+    for (int i = index; i < regex->NumUnionMembers; i++) {
+        regex->UnionMembers[i] = regex->UnionMembers[i + 1];
+    }
+
+    // TODO: Free the deleted thing??
+}
+
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
     assert(ex->NumUnits < MAX_UNITS);
 

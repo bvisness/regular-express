@@ -45,6 +45,7 @@ struct Regex {
 };
 
 void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex);
+void Regex_RemoveUnionMember(Regex* regex, int index);
 
 typedef struct NoUnionEx {
     int NumUnits;
