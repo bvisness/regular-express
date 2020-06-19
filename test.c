@@ -105,6 +105,7 @@ enum {
 	DRAG_TYPE_WIRE,
 	DRAG_TYPE_BOX_SELECT,
 	DRAG_TYPE_MOVE_UNITS,
+	DRAG_TYPE_CREATE_UNION,
 };
 
 typedef struct DragWire {
@@ -138,6 +139,13 @@ typedef struct DragMoveUnits {
 
 NoUnionEx moveUnitsEx;
 
+typedef struct DragCreateUnion {
+	UnitRange Units;
+	Unit* OriginUnit;
+	Vec2i WireStartPos;
+	int WhichHandle;
+} DragCreateUnion;
+
 typedef struct DragContext {
 	int Type;
 
@@ -145,6 +153,7 @@ typedef struct DragContext {
 		DragWire Wire;
 		DragBoxSelect BoxSelect;
 		DragMoveUnits MoveUnits;
+		DragCreateUnion CreateUnion;
 	};
 } DragContext;
 
@@ -434,8 +443,8 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
 	int isHover = !(drag.Type == DRAG_TYPE_BOX_SELECT) && mu_mouse_over(ctx, rect);
 	int isWireDragOrigin = (
-		drag.Type == DRAG_TYPE_WIRE
-		&& drag.Wire.OriginUnit == unit
+		(drag.Type == DRAG_TYPE_WIRE && drag.Wire.OriginUnit == unit)
+		|| (drag.Type == DRAG_TYPE_CREATE_UNION && drag.CreateUnion.OriginUnit == unit)
 	);
 	int nonSingular = Unit_IsNonSingular(unit);
 	int isSelected = 0;
@@ -680,25 +689,60 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		if (!drag.Type && ctx->mouse_started_drag) {
 			// maybe start drag
 			if (overLeftHandle) {
-				drag = (DragContext) {
-					.Type = DRAG_TYPE_WIRE,
-					.Wire = (DragWire) {
-						.OriginUnit = unit,
-						.UnitBeforeHandle = Unit_Previous(unit),
-						.UnitAfterHandle = unit,
-						.WhichHandle = DRAG_WIRE_LEFT_HANDLE,
-					},
-				};
+				if (ctx->key_down & MU_KEY_CTRL) {
+					UnitRange units = (UnitRange) { .StartUnit = unit, .EndUnit = unit };
+					if (units.StartUnit == selection.StartUnit) {
+						units = selection;
+					}
+
+					drag = (DragContext) {
+						.Type = DRAG_TYPE_CREATE_UNION,
+						.CreateUnion = (DragCreateUnion) {
+							.Units = units,
+							.OriginUnit = unit,
+							.WhichHandle = DRAG_WIRE_LEFT_HANDLE,
+						},
+					};
+				} else {
+					drag = (DragContext) {
+						.Type = DRAG_TYPE_WIRE,
+						.Wire = (DragWire) {
+							.OriginUnit = unit,
+							.UnitBeforeHandle = Unit_Previous(unit),
+							.UnitAfterHandle = unit,
+							.WhichHandle = DRAG_WIRE_LEFT_HANDLE,
+						},
+					};
+				}
 			} else if (overRightHandle) {
-				drag = (DragContext) {
-					.Type = DRAG_TYPE_WIRE,
-					.Wire = (DragWire) {
-						.OriginUnit = unit,
-						.UnitBeforeHandle = unit,
-						.UnitAfterHandle = Unit_Next(unit),
-						.WhichHandle = DRAG_WIRE_RIGHT_HANDLE,
-					},
-				};
+				if (ctx->key_down & MU_KEY_CTRL) {
+					Unit* next = Unit_Next(unit);
+					if (next) {
+						UnitRange units = (UnitRange) { .StartUnit = next, .EndUnit = next };
+						if (units.StartUnit == selection.StartUnit) {
+							units = selection;
+						}
+
+						drag = (DragContext) {
+							.Type = DRAG_TYPE_CREATE_UNION,
+							.CreateUnion = (DragCreateUnion) {
+								.Units = units,
+								.OriginUnit = unit,
+								.WhichHandle = DRAG_WIRE_RIGHT_HANDLE,
+							},
+						};
+					}
+				} else {
+					drag = (DragContext) {
+						.Type = DRAG_TYPE_WIRE,
+						.Wire = (DragWire) {
+							.OriginUnit = unit,
+							.UnitBeforeHandle = unit,
+							.UnitAfterHandle = Unit_Next(unit),
+							.WhichHandle = DRAG_WIRE_RIGHT_HANDLE,
+						},
+					};
+				}
 			} else if (mu_mouse_over(ctx, contentsRect)) {
 				moveUnitsEx = (NoUnionEx) {0};
 
@@ -837,6 +881,18 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 					.y = leftHandleRect.y + leftHandleRect.h/2,
 				};
 			} else if (drag.Wire.WhichHandle == DRAG_WIRE_RIGHT_HANDLE) {
+				drag.Wire.WireStartPos = (Vec2i) {
+					.x = rightHandleRect.x + rightHandleRect.w/2,
+					.y = rightHandleRect.y + rightHandleRect.h/2,
+				};
+			}
+		} else if (drag.Type == DRAG_TYPE_CREATE_UNION && drag.CreateUnion.OriginUnit == unit) {
+			if (drag.CreateUnion.WhichHandle == DRAG_WIRE_LEFT_HANDLE) {
+				drag.CreateUnion.WireStartPos = (Vec2i) {
+					.x = leftHandleRect.x + leftHandleRect.w/2,
+					.y = leftHandleRect.y + leftHandleRect.h/2,
+				};
+			} else if (drag.CreateUnion.WhichHandle == DRAG_WIRE_RIGHT_HANDLE) {
 				drag.Wire.WireStartPos = (Vec2i) {
 					.x = rightHandleRect.x + rightHandleRect.w/2,
 					.y = rightHandleRect.y + rightHandleRect.h/2,
@@ -1008,6 +1064,27 @@ int frame(float dt) {
 				);
 			} else if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
 				drawRailroad_NoUnionEx(&moveUnitsEx, (Vec2i) { .x = ctx->mouse_pos.x, .y = ctx->mouse_pos.y }, 0);
+			} else if (drag.Type == DRAG_TYPE_CREATE_UNION) {
+				mu_draw_rect(
+					ctx,
+					mu_rect(
+						drag.CreateUnion.WireStartPos.x - WIRE_THICKNESS/2,
+						imin(ctx->mouse_pos.y, drag.CreateUnion.WireStartPos.y) - WIRE_THICKNESS/2,
+						WIRE_THICKNESS,
+						WIRE_THICKNESS/2 + iabs(ctx->mouse_pos.y - drag.CreateUnion.WireStartPos.y) + WIRE_THICKNESS/2
+					),
+					COLOR_WIRE
+				);
+				mu_draw_rect(
+					ctx,
+					mu_rect(
+						drag.CreateUnion.WireStartPos.x - WIRE_THICKNESS/2,
+						ctx->mouse_pos.y - WIRE_THICKNESS/2,
+						WIRE_THICKNESS/2 + imax(0, ctx->mouse_pos.x - drag.CreateUnion.WireStartPos.x) + WIRE_THICKNESS/2,
+						WIRE_THICKNESS
+					),
+					COLOR_WIRE
+				);
 			}
 		}
 
@@ -1057,6 +1134,20 @@ int frame(float dt) {
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
 		if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
 			moveUnitsTo(drag.MoveUnits.OriginEx, drag.MoveUnits.OriginIndex);
+		} else if (drag.Type == DRAG_TYPE_CREATE_UNION) {
+			UnitRange units = drag.CreateUnion.Units;
+			NoUnionEx* parent = units.StartUnit->Parent;
+			int startIndex = units.StartUnit->Index;
+			int endIndex = units.EndUnit->Index;
+
+			Unit* newUnit = RangeToGroup(units);
+
+			NoUnionEx* newUnionMember = NoUnionEx_init(RE_NEW(NoUnionEx));
+			Unit* initialUnit = Unit_init(RE_NEW(Unit));
+			NoUnionEx_AddUnit(newUnionMember, initialUnit, -1);
+			Regex_AddUnionMember(newUnit->Contents->Group->Regex, newUnionMember);
+
+			NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
 		}
 
 		drag = (DragContext) {0};
