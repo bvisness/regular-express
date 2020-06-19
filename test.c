@@ -23,6 +23,8 @@ extern void canvas_circle(int x, int y, float radius, COLORPARAMS);
 
 extern int measureText(const char* text, int len);
 
+extern void copyText(char* text);
+
 static int text_width(mu_Font font, const char *text, int len) {
 	if (len < 0) {
 		len = strlen(text);
@@ -1023,8 +1025,14 @@ int frame(float dt) {
 	}
 
 	if (mu_begin_window(ctx, "Final Regex", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 80))) {
-		mu_layout_row(ctx, 1, (int[]) { -1 }, -1);
-		mu_label(ctx, ToString(regex));
+		mu_layout_row(ctx, 2, (int[]) { 500, -10 }, -1);
+
+		char* regexString = ToString(regex);
+		mu_label(ctx, regexString);
+
+		if (mu_button(ctx, "Copy")) {
+			copyText(regexString);
+		}
 
 		mu_end_window(ctx);
 	}
