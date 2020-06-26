@@ -77,6 +77,7 @@ typedef struct Unit {
     int Index;
 
     int IsHover;
+    int IsContentHover;
     int IsWireDragOrigin;
     int IsSelected;
 

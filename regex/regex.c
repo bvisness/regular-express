@@ -16,6 +16,7 @@ void Regex_RemoveUnionMember(Regex* regex, int index) {
 
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
     assert(ex->NumUnits < MAX_UNITS);
+    assert(unit->Parent == NULL);
 
     unit->Parent = ex;
     unit->Index = index;
@@ -48,6 +49,7 @@ Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index) {
     if (index == -1) {
         ex->NumUnits--;
         Unit* unit = ex->Units[ex->NumUnits];
+        unit->Parent = NULL;
         return unit;
     }
 
@@ -59,6 +61,7 @@ Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index) {
         ex->Units[i]->Index = i;
     }
 
+    unit->Parent = NULL;
     return unit;
 }
 

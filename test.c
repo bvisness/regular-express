@@ -159,24 +159,38 @@ typedef struct DragContext {
 
 DragContext drag;
 
+void MoveUnitsTo(UnitRange range, NoUnionEx* ex, int startIndex) {
+	int i = startIndex;
+	ITER_UnitRange(range, it) {
+		NoUnionEx_RemoveUnit(it->Parent, it->Index);
+		it->Parent = NULL;
+		NoUnionEx_AddUnit(ex, it, i);
+		if (i != -1) {
+			i++;
+		}
+	}
+}
+
 // TODO: Please move this somewhere else. This is all way too big.
-Unit* RangeToGroup(UnitRange range) {
+Unit* ConvertRangeToGroup(UnitRange range) {
+	NoUnionEx* parent = range.StartUnit->Parent;
+	int startIndex = range.StartUnit->Index;
+
 	Unit* newUnit = Unit_init(RE_NEW(Unit));
 	UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
 
 	NoUnionEx* ex = newUnit->Contents->Group->Regex->UnionMembers[0];
+	MoveUnitsTo(range, ex, -1);
 
-	ITER_UnitRange(range, it) {
-		NoUnionEx_AddUnit(ex, it, -1);
-	}
+	NoUnionEx_AddUnit(parent, newUnit, startIndex);
 
 	return newUnit;
 }
 
-void moveUnitsTo(NoUnionEx* ex, int index) {
+void MoveAllUnitsTo(NoUnionEx* ex, int index) {
 	while (moveUnitsEx.NumUnits > 0) {
-		NoUnionEx_AddUnit(ex, moveUnitsEx.Units[moveUnitsEx.NumUnits-1], index);
-		NoUnionEx_RemoveUnit(&moveUnitsEx, -1);
+		Unit* unit = NoUnionEx_RemoveUnit(&moveUnitsEx, -1);
+		NoUnionEx_AddUnit(ex, unit, index);
 	}
 }
 
@@ -273,6 +287,10 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 		wireHeight = imax(wireHeight, unit->WireHeight);
 
 		unit->Parent = ex;
+
+		if (unit->Index != i) {
+			printf("WARNING! Unit %p had index %d, expected %d.", unit, unit->Index, i);
+		}
 		unit->Index = i;
 	}
 
@@ -480,9 +498,18 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		}
 	}
 
+	mu_Rect contentsRect = mu_rect(
+		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+		origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
+		unit->Contents->Size.w,
+		unit->Contents->Size.h
+	);
+	int isContentHover = isHover && mu_mouse_over(ctx, contentsRect);
+
 	// save some of 'em for the next pass
 	unit->LastRect = rect;
 	unit->IsHover = isHover;
+	unit->IsContentHover = isContentHover;
 	unit->IsWireDragOrigin = isWireDragOrigin;
 	unit->IsSelected = isSelected;
 
@@ -609,12 +636,6 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		);
 	}
 
-	mu_Rect contentsRect = mu_rect(
-		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
-		origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
-		unit->Contents->Size.w,
-		unit->Contents->Size.h
-	);
 	drawRailroad_UnitContents(
 		unit->Contents,
 		(Vec2i) {
@@ -785,8 +806,8 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 
 				for (int i = 0; i < numUnits; i++) {
 					Unit* addedUnit = originEx->Units[originIndex];
-					NoUnionEx_AddUnit(&moveUnitsEx, addedUnit, -1);
 					Unit* removedUnit = NoUnionEx_RemoveUnit(originEx, originIndex);
+					NoUnionEx_AddUnit(&moveUnitsEx, addedUnit, -1);
 					assert(addedUnit == removedUnit)
 				}
 
@@ -866,28 +887,22 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 						Unit_SetRepeatMax(groupUnits.StartUnit, 0);
 					}
 				} else {
-					int parent = groupUnits.StartUnit->Parent;
-					int startIndex = groupUnits.StartUnit->Index;
-					int endIndex = groupUnits.EndUnit->Index;
-
-					Unit* newUnit = RangeToGroup(groupUnits);
+					Unit* newUnit = ConvertRangeToGroup(groupUnits);
 
 					if (isForward) {
 						Unit_SetRepeatMin(newUnit, 0);
 					} else {
 						Unit_SetRepeatMax(newUnit, 0);
 					}
-
-					NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
 				}
 			}
 		} else if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
 			if (mu_mouse_over(ctx, leftHandleZoneRect)) {
 				didHandleDrag = 1;
-				moveUnitsTo(unit->Parent, unit->Index);
+				MoveAllUnitsTo(unit->Parent, unit->Index);
 			} else if (mu_mouse_over(ctx, rightHandleZoneRect)) {
 				didHandleDrag = 1;
-				moveUnitsTo(unit->Parent, unit->Index+1);
+				MoveAllUnitsTo(unit->Parent, unit->Index+1);
 			}
 		}
 
@@ -1111,6 +1126,19 @@ int frame(float dt) {
 			}
 		}
 
+		// draw floating UI
+		if (selection.StartUnit) {
+			// selection bounding box
+			mu_Rect sbb = selection.StartUnit->LastRect;
+
+			const int BUTTON_WIDTH = 100;
+
+			mu_layout_set_next(ctx, mu_rect(sbb.x + sbb.w/2 - BUTTON_WIDTH/2, sbb.y - 20, BUTTON_WIDTH, 20), 0);
+			if (!drag.Type && mu_button(ctx, "Make Group")) {
+				ConvertRangeToGroup(selection);
+			}
+		}
+
 		if (ctx->mouse_down & MU_MOUSE_LEFT && ctx->mouse_started_drag && !drag.Type) {
 			// nothing else consumed the mouse click, so start a box select
 			drag = (DragContext) {
@@ -1138,16 +1166,6 @@ int frame(float dt) {
 	}
 
 	if (mu_begin_window(ctx, "Tree View", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 400))) {
-		if (selection.StartUnit && mu_button(ctx, "Make Group")) {
-			NoUnionEx* parent = selection.StartUnit->Parent;
-			int startIndex = selection.StartUnit->Index;
-			int endIndex = selection.EndUnit->Index;
-
-			Unit* newUnit = RangeToGroup(selection);
-
-			NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
-		}
-
 		doTree(ctx, regex);
 
 		mu_end_window(ctx);
@@ -1156,21 +1174,16 @@ int frame(float dt) {
 	// mouse up; end all drags
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
 		if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
-			moveUnitsTo(drag.MoveUnits.OriginEx, drag.MoveUnits.OriginIndex);
+			MoveAllUnitsTo(drag.MoveUnits.OriginEx, drag.MoveUnits.OriginIndex);
 		} else if (drag.Type == DRAG_TYPE_CREATE_UNION) {
 			UnitRange units = drag.CreateUnion.Units;
-			NoUnionEx* parent = units.StartUnit->Parent;
-			int startIndex = units.StartUnit->Index;
-			int endIndex = units.EndUnit->Index;
 
-			Unit* newUnit = RangeToGroup(units);
+			Unit* newUnit = ConvertRangeToGroup(units);
 
 			NoUnionEx* newUnionMember = NoUnionEx_init(RE_NEW(NoUnionEx));
 			Unit* initialUnit = Unit_init(RE_NEW(Unit));
 			NoUnionEx_AddUnit(newUnionMember, initialUnit, -1);
 			Regex_AddUnionMember(newUnit->Contents->Group->Regex, newUnionMember);
-
-			NoUnionEx_ReplaceUnits(parent, startIndex, endIndex, newUnit);
 		}
 
 		drag = (DragContext) {0};

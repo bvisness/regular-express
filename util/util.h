@@ -57,6 +57,15 @@ static inline float interp_linear(float dt, float current, float target, float r
     return result;
 }
 
+static inline mu_Rect rect_union(mu_Rect r1, mu_Rect r2) {
+    return mu_rect(
+        imin(r1.x, r2.x),
+        imin(r1.y, r2.y),
+        imax(r1.x + r1.w, r2.x + r2.w) - imin(r1.x, r2.x),
+        imax(r1.y + r1.h, r2.y + r2.h) - imin(r1.y, r2.y)
+    );
+}
+
 static inline mu_Rect rect_intersect(mu_Rect r1, mu_Rect r2) {
     int x1 = imax(r1.x, r2.x);
     int y1 = imax(r1.y, r2.y);
