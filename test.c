@@ -742,6 +742,16 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 			mu_set_focus(ctx, mu_get_id(ctx, &newUnit, sizeof(Unit*)));
 
 			ctx->input_text[0] = 0;
+		} else if (ctx->key_pressed & MU_KEY_HOME) {
+			for (Unit* it = unit; it; it = Unit_Previous(it)) {
+				mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
+			}
+			cursorLeft = 1;
+		} else if (ctx->key_pressed & MU_KEY_END) {
+			for (Unit* it = unit; it; it = Unit_Next(it)) {
+				mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
+			}
+			cursorLeft = 0;
 		}
 	}
 

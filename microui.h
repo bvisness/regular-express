@@ -111,6 +111,8 @@ enum {
   MU_KEY_ARROWUP      = (1 << 7),
   MU_KEY_ARROWDOWN    = (1 << 8),
   MU_KEY_DELETE       = (1 << 9),
+  MU_KEY_HOME         = (1 << 10),
+  MU_KEY_END          = (1 << 11),
 };
 
 

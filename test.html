@@ -200,6 +200,8 @@
 				// MU_KEY_ARROWUP      = (1 << 7),
 				// MU_KEY_ARROWDOWN    = (1 << 8),
 				// MU_KEY_DELETE       = (1 << 9),
+				// MU_KEY_HOME         = (1 << 10),
+				// MU_KEY_END          = (1 << 11),
 
 				if (e.key === 'Shift') {
 					func(1 << 0);
@@ -221,6 +223,10 @@
 					func(1 << 8);
 				} else if (e.key === 'Delete') {
 					func(1 << 9);
+				} else if (e.key === 'Home') {
+					func(1 << 10);
+				} else if (e.key === 'End') {
+					func(1 << 11);
 				}
 
 				window.requestAnimationFrame(doFrame);
