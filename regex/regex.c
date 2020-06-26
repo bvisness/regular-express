@@ -118,10 +118,6 @@ int Unit_IsRepeat(Unit* unit) {
     return unit->RepeatMax != 1;
 }
 
-int Unit_ShouldShowWires(Unit* unit) {
-    return unit->IsHover || unit->IsWireDragOrigin || Unit_IsNonSingular(unit);
-}
-
 int Unit_ShouldShowLeftHandle(Unit* unit) {
     if (Unit_Previous(unit)) {
         return 0;
@@ -130,21 +126,32 @@ int Unit_ShouldShowLeftHandle(Unit* unit) {
     if (unit->IsSelected) {
         return 1;
     } else {
-        return Unit_ShouldShowWires(unit);
+        return (
+            unit->IsLeftWireHover
+            || unit->IsContentHover
+            || (unit->IsRightWireHover && unit->IsShowingLeftHandle)
+            || unit->IsWireDragOrigin
+        );
     }
 }
 
 int Unit_ShouldShowRightHandle(Unit* unit) {
     Unit* next = Unit_Next(unit);
+    Unit* prev = Unit_Previous(unit);
 
     if (!unit->IsSelected && (next && next->IsSelected)) {
         return 1;
     } else if (unit->IsSelected && !(next && next->IsSelected)) {
         return 1;
     } else if (!unit->IsSelected) {
+        int rightWireActive = unit->IsRightWireHover || unit->IsWireDragOrigin;
         return (
-            Unit_ShouldShowWires(unit)
-            || (Unit_Next(unit) && Unit_ShouldShowWires(Unit_Next(unit)))
+            unit->IsContentHover
+            || unit->IsLeftWireHover
+            || rightWireActive
+            || (prev && prev->IsRightWireHover && unit->IsShowingRightHandle)
+            || (next && next->IsContentHover)
+            || (next && next->IsRightWireHover && unit->IsShowingRightHandle)
         );
     }
 

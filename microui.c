@@ -111,7 +111,7 @@ static mu_Rect intersect_rects(mu_Rect r1, mu_Rect r2) {
 
 
 static int rect_overlaps_vec2(mu_Rect r, mu_Vec2 p) {
-  return p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
+  return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
 }
 
 

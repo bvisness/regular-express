@@ -78,6 +78,10 @@ typedef struct Unit {
 
     int IsHover;
     int IsContentHover;
+    int IsLeftWireHover;
+    int IsRightWireHover;
+    int IsShowingLeftHandle;
+    int IsShowingRightHandle;
     int IsWireDragOrigin;
     int IsSelected;
 
@@ -92,7 +96,6 @@ void Unit_SetRepeatMax(Unit* unit, int val);
 int Unit_IsNonSingular(Unit* unit);
 int Unit_IsSkip(Unit* unit);
 int Unit_IsRepeat(Unit* unit);
-int Unit_ShouldShowWires(Unit* unit);
 int Unit_ShouldShowLeftHandle(Unit* unit);
 int Unit_ShouldShowRightHandle(Unit* unit);
 

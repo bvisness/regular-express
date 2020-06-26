@@ -513,8 +513,6 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 	unit->IsWireDragOrigin = isWireDragOrigin;
 	unit->IsSelected = isSelected;
 
-	mu_push_clip_rect(ctx, rect);
-
 	int middleY = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT + unit->Contents->WireHeight;
 
 	// thru-wires
@@ -549,9 +547,14 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 	mu_Rect rightHandleRect;
 	int overLeftHandle = 0;
 	int overRightHandle = 0;
+	int shouldShowLeftHandle = Unit_ShouldShowLeftHandle(unit);
+	int shouldShowRightHandle = Unit_ShouldShowRightHandle(unit);
+
+	unit->IsShowingLeftHandle = shouldShowLeftHandle;
+	unit->IsShowingRightHandle = shouldShowRightHandle;
 
 	// left handle
-	if (Unit_ShouldShowLeftHandle(unit)) {
+	if (shouldShowLeftHandle) {
 		int handleX = origin.x + unit->LeftHandleZoneWidth/2 - HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
 		mu_draw_rect(ctx, handleRect, COLOR_WIRE);
@@ -559,7 +562,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		overLeftHandle = mu_mouse_over(ctx, handleRect);
 	}
 	// right handle
-	if (Unit_ShouldShowRightHandle(unit)) {
+	if (shouldShowRightHandle) {
 		int handleX = origin.x
 			+ unit->LeftHandleZoneWidth
 			+ (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
@@ -572,6 +575,21 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		rightHandleRect = handleRect;
 		overRightHandle = mu_mouse_over(ctx, handleRect);
 	}
+
+	unit->IsLeftWireHover = mu_mouse_over(ctx, mu_rect(
+		origin.x,
+		contentsRect.y,
+		unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+		unit->Contents->Size.y
+	));
+	unit->IsRightWireHover = mu_mouse_over(ctx, mu_rect(
+		contentsRect.x + contentsRect.w,
+		contentsRect.y,
+		(nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
+			+ unit->RightHandleZoneWidth
+			+ (Unit_Next(unit) && Unit_IsNonSingular(Unit_Next(unit)) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
+		unit->Contents->Size.y
+	));
 
 	int leftWireX = origin.x
 		+ unit->LeftHandleZoneWidth
@@ -699,10 +717,8 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		);
 	}
 
-	mu_pop_clip_rect(ctx);
-
-	int targetLeftHandleZoneWidth = Unit_ShouldShowLeftHandle(unit) ? UNIT_HANDLE_ZONE_WIDTH : 0;
-	int targetRightHandleZoneWidth = Unit_ShouldShowRightHandle(unit) ? UNIT_HANDLE_ZONE_WIDTH : 0;
+	int targetLeftHandleZoneWidth = shouldShowLeftHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;
+	int targetRightHandleZoneWidth = shouldShowRightHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;
 
 	int animating = 0;
 	unit->LeftHandleZoneWidth = interp_linear(ctx->dt, unit->LeftHandleZoneWidth, targetLeftHandleZoneWidth, 160, &animating);
