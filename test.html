@@ -198,7 +198,8 @@
 				// MU_KEY_ARROWLEFT    = (1 << 5),
 				// MU_KEY_ARROWRIGHT   = (1 << 6),
 				// MU_KEY_ARROWUP      = (1 << 7),
-				// MU_KEY_ARROWDOWN    = (1 << 8)
+				// MU_KEY_ARROWDOWN    = (1 << 8),
+				// MU_KEY_DELETE       = (1 << 9),
 
 				if (e.key === 'Shift') {
 					func(1 << 0);
@@ -218,6 +219,8 @@
 					func(1 << 7);
 				} else if (e.key === 'ArrowDown') {
 					func(1 << 8);
+				} else if (e.key === 'Delete') {
+					func(1 << 9);
 				}
 
 				window.requestAnimationFrame(doFrame);

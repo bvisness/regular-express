@@ -194,6 +194,9 @@ void MoveAllUnitsTo(NoUnionEx* ex, int index) {
 	}
 }
 
+// TODO: When we have implemented cursor position in text, can we get rid of this?
+int cursorLeft = 0;
+
 Regex* regex;
 
 void init() {
@@ -673,26 +676,66 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 			Unit* prev = Unit_Previous(unit);
 			if (prev) {
 				mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+			} else {
+				cursorLeft = 1;
 			}
 		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
 
-			Unit* next = Unit_Next(unit);
-			if (next) {
-				mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+			if (Unit_Previous(unit) && cursorLeft) {
+				cursorLeft = 0;
+			} else {
+				Unit* next = Unit_Next(unit);
+				if (next) {
+					mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+				}
 			}
 		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
 			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 
-			Unit* prev = Unit_Previous(unit);
-			Unit* next = Unit_Next(unit);
-			if (prev) {
-				mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
-			} else if (next) {
-				mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
-			}
+			if (cursorLeft) {
+				Unit* toDelete = Unit_Previous(unit);
+				if (toDelete) {
+					Unit* destination = Unit_Previous(toDelete);
+					mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
+					NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
+					cursorLeft = 0;
+				}
+			} else {
+				Unit* prev = Unit_Previous(unit);
+				Unit* next = Unit_Next(unit);
+				if (prev) {
+					mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+				} else if (next) {
+					mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+					cursorLeft = 1;
+				}
 
-			NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
+				NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
+			}
+		} else if (ctx->key_pressed & MU_KEY_DELETE) {
+			ctx->key_pressed &= ~MU_KEY_DELETE;
+
+			if (cursorLeft) {
+				Unit* prev = Unit_Previous(unit);
+				Unit* next = Unit_Next(unit);
+				if (next) {
+					mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+				} else if (prev) {
+					mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+					cursorLeft = 0;
+				}
+
+				NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
+			} else {
+				Unit* toDelete = Unit_Next(unit);
+				if (toDelete) {
+					Unit* destination = Unit_Next(toDelete);
+					mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
+					NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
+					cursorLeft = 1;
+				}
+			}
 		} else if (strlen(ctx->input_text) == 1) {
 			Unit* newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), *ctx->input_text);
 			NoUnionEx_AddUnit(unit->Parent, newUnit, unit->Index + 1);
@@ -705,16 +748,29 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 	// again, because we may have changed the focus
 	if (ctx->focus == muid) {
 		// draw cursor
-		mu_draw_rect(
-			ctx,
-			mu_rect(
-				contentsRect.x + contentsRect.w - 1 - CURSOR_THICKNESS,
-				contentsRect.y + CURSOR_VERTICAL_PADDING,
-				CURSOR_THICKNESS,
-				contentsRect.h - CURSOR_VERTICAL_PADDING*2
-			),
-			COLOR_CURSOR
-		);
+		if (cursorLeft) {
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					contentsRect.x,
+					contentsRect.y + CURSOR_VERTICAL_PADDING,
+					CURSOR_THICKNESS,
+					contentsRect.h - CURSOR_VERTICAL_PADDING*2
+				),
+				COLOR_CURSOR
+			);
+		} else {
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					contentsRect.x + contentsRect.w - CURSOR_THICKNESS,
+					contentsRect.y + CURSOR_VERTICAL_PADDING,
+					CURSOR_THICKNESS,
+					contentsRect.h - CURSOR_VERTICAL_PADDING*2
+				),
+				COLOR_CURSOR
+			);
+		}
 	}
 
 	int targetLeftHandleZoneWidth = shouldShowLeftHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;

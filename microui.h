@@ -109,7 +109,8 @@ enum {
   MU_KEY_ARROWLEFT    = (1 << 5),
   MU_KEY_ARROWRIGHT   = (1 << 6),
   MU_KEY_ARROWUP      = (1 << 7),
-  MU_KEY_ARROWDOWN    = (1 << 8)
+  MU_KEY_ARROWDOWN    = (1 << 8),
+  MU_KEY_DELETE       = (1 << 9),
 };
 
 
