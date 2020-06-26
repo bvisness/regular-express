@@ -798,6 +798,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 	if (ctx->mouse_released & MU_MOUSE_LEFT) {
 		if (mu_mouse_over(ctx, contentsRect) && unit->Contents->Type == RE_CONTENTS_LITCHAR) {
 			mu_set_focus(ctx, muid);
+			selection = (UnitRange) {0};
 		}
 	}
 
@@ -1198,6 +1199,14 @@ int frame(float dt) {
 			}
 		}
 
+		if (ctx->key_pressed & (MU_KEY_BACKSPACE | MU_KEY_DELETE) && selection.StartUnit) {
+			NoUnionEx* ex = selection.StartUnit->Parent;
+			int startIndex = selection.StartUnit->Index;
+			ITER_UnitRange(selection, it) {
+				NoUnionEx_RemoveUnit(ex, startIndex);
+			}
+		}
+
 		// draw floating UI
 		if (selection.StartUnit) {
 			// selection bounding box
@@ -1219,6 +1228,7 @@ int frame(float dt) {
 					.StartPos = (Vec2i) { .x = ctx->mouse_down_pos.x, .y = ctx->mouse_down_pos.y },
 				},
 			};
+			mu_set_focus(ctx, 0);
 		}
 
 		mu_end_window(ctx);
