@@ -738,8 +738,9 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 			}
 		} else if (strlen(ctx->input_text) == 1) {
 			Unit* newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), *ctx->input_text);
-			NoUnionEx_AddUnit(unit->Parent, newUnit, unit->Index + 1);
+			NoUnionEx_AddUnit(unit->Parent, newUnit, (cursorLeft ? unit->Index : unit->Index + 1));
 			mu_set_focus(ctx, mu_get_id(ctx, &newUnit, sizeof(Unit*)));
+			cursorLeft = 0;
 
 			ctx->input_text[0] = 0;
 		} else if (ctx->key_pressed & MU_KEY_HOME) {
