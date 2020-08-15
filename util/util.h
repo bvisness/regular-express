@@ -1,6 +1,8 @@
 #ifndef REGEX_INTERP_H
 #define REGEX_INTERP_H
 
+#include "../microui.h"
+
 static inline int iabs(int a) {
     return (a < 0) ? -a : a;
 }
@@ -50,7 +52,7 @@ static inline float interp_linear(float dt, float current, float target, float r
         result =  fmin(target, current + rate * dt);
     }
 
-    if (changed != NULL && result != current) {
+    if (changed != 0 && result != current) {
         *changed = 1;
     }
 

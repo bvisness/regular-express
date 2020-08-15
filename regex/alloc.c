@@ -1,4 +1,5 @@
 #include "alloc.h"
+#include "textinput.h"
 
 #define RE_DEFINE_POOL(T) 			\
 Pool RE_POOL_NAME(T);				\
@@ -29,6 +30,7 @@ Regex* Regex_init(Regex* regex) {
 }
 
 NoUnionEx* NoUnionEx_init(NoUnionEx* ex) {
+	ex->TextState = DEFAULT_TEXT_INPUT_STATE;
 	return ex;
 }
 

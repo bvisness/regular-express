@@ -136,22 +136,6 @@ typedef struct {
 typedef struct { unsigned char r, g, b, a; } mu_Color;
 typedef struct { mu_Id id; int last_update; } mu_PoolItem;
 
-/*
-These are some ideas for text input logic. The input functions
-would set some state in the context that the active control could
-use to actually perform actions like inserting content at an
-index or deleting a range.
-
-typedef struct {
-  int cursorPosition;
-  int selectionBase;
-} mu_TextInputState;
-
-setCursorPosition(int i, int select);
-moveCursor(int delta, int select);
-bumpCursor(int direction, int select);
-*/
-
 typedef struct { int type, size; } mu_BaseCommand;
 typedef struct { mu_BaseCommand base; void *dst; } mu_JumpCommand;
 typedef struct { mu_BaseCommand base; mu_Rect rect; } mu_ClipCommand;

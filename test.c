@@ -194,9 +194,6 @@ void MoveAllUnitsTo(NoUnionEx* ex, int index) {
 	}
 }
 
-// TODO: When we have implemented cursor position in text, can we get rid of this?
-int cursorLeft = 0;
-
 Regex* regex;
 
 void init() {
@@ -385,7 +382,7 @@ void prepass_Group(Group* group) {
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth);
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth);
-void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth);
+void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth);
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected);
 void drawRailroad_Set(Set* set, Vec2i origin);
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected);
@@ -493,11 +490,32 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
 }
 
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
+	mu_Id muid = mu_get_id(ctx, &ex, sizeof(NoUnionEx*));
+
+	ex->ClickedUnitIndex = -1;
+
+	if (ctx->focus == muid) {
+		ctx->updated_focus = 1;
+
+		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+
+			ex->TextState = bumpCursor(ex->TextState, -1, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+
+			ex->TextState = bumpCursor(ex->TextState, 1, 0); // TODO: Selection
+		}
+	}
+
+	ex->TextState.CursorPosition = iclamp(ex->TextState.CursorPosition, 0, ex->NumUnits);
+
 	int unitX = origin.x;
 	for (int i = 0; i < ex->NumUnits; i++) {
 		Unit* unit = ex->Units[i];
 		drawRailroad_Unit(
 			unit,
+			ex,
 			(Vec2i) {
 				.x = unitX,
 				.y = origin.y + ex->WireHeight - unit->WireHeight,
@@ -507,9 +525,50 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 
 		unitX += unit->Size.w;
 	}
+
+	if (ex->ClickedUnitIndex != -1) {
+		ex->TextState = setCursorPosition(ex->TextState, ex->ClickedUnitIndex, 0); // TODO: Selection
+	}
+
+	if (ctx->focus == muid) {
+		Unit* cursorUnit;
+		int cursorRight = 0;
+		if (ex->TextState.CursorPosition >= ex->NumUnits) {
+			cursorUnit = ex->Units[ex->NumUnits - 1];
+			cursorRight = 1;
+		} else {
+			cursorUnit = ex->Units[ex->TextState.CursorPosition];
+		}
+
+		mu_Rect contentsRect = cursorUnit->Contents->LastRect;
+
+		if (cursorRight) {
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					contentsRect.x + contentsRect.w - CURSOR_THICKNESS,
+					contentsRect.y + CURSOR_VERTICAL_PADDING,
+					CURSOR_THICKNESS,
+					contentsRect.h - CURSOR_VERTICAL_PADDING*2
+				),
+				COLOR_CURSOR
+			);
+		} else {
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					contentsRect.x,
+					contentsRect.y + CURSOR_VERTICAL_PADDING,
+					CURSOR_THICKNESS,
+					contentsRect.h - CURSOR_VERTICAL_PADDING*2
+				),
+				COLOR_CURSOR
+			);
+		}
+	}
 }
 
-void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
+void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth) {
 	mu_Id muid = mu_get_id(ctx, &unit, sizeof(Unit*));
 
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
@@ -695,122 +754,104 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 		isSelected
 	);
 
-	if (ctx->focus == muid) {
-		ctx->updated_focus = 1;
+	// if (ctx->focus == muid) {
+	// 	ctx->updated_focus = 1;
 
-		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+		// if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
+		// 	ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
 
-			Unit* prev = Unit_Previous(unit);
-			if (prev) {
-				mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
-			} else {
-				cursorLeft = 1;
-			}
-		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+		// 	Unit* prev = Unit_Previous(unit);
+		// 	if (prev) {
+		// 		mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+		// 	} else {
+		// 		cursorLeft = 1;
+		// 	}
+		// } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
+		// 	ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
 
-			if (Unit_Previous(unit) && cursorLeft) {
-				cursorLeft = 0;
-			} else {
-				Unit* next = Unit_Next(unit);
-				if (next) {
-					mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
-				}
-			}
-		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
-			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+		// 	if (unit->Contents->Type == RE_CONTENTS_SET) {
+		// 		cursorIndexInSet++;
 
-			if (cursorLeft) {
-				Unit* toDelete = Unit_Previous(unit);
-				if (toDelete) {
-					Unit* destination = Unit_Previous(toDelete);
-					mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
-					NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
-					cursorLeft = 0;
-				}
-			} else {
-				Unit* prev = Unit_Previous(unit);
-				Unit* next = Unit_Next(unit);
-				if (prev) {
-					mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
-				} else if (next) {
-					mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
-					cursorLeft = 1;
-				}
+		// 		if (cursorIndexInSet >= unit->Contents->Set->NumItems) {
+		// 			// TODO: move to next unit
+		// 		} else {
+		// 			cursorIndexInSet = unit->Contents->Set->NumItems - 1;
+		// 		}
+		// 	} else {
+		// 		if (Unit_Previous(unit) && cursorLeft) {
+		// 			cursorLeft = 0;
+		// 		} else {
+		// 			Unit* next = Unit_Next(unit);
+		// 			if (next) {
+		// 				mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+		// 			}
+		// 		}
+		// 	}
+		// } else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
+		// 	ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 
-				NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
-			}
-		} else if (ctx->key_pressed & MU_KEY_DELETE) {
-			ctx->key_pressed &= ~MU_KEY_DELETE;
+		// 	if (cursorLeft) {
+		// 		Unit* toDelete = Unit_Previous(unit);
+		// 		if (toDelete) {
+		// 			Unit* destination = Unit_Previous(toDelete);
+		// 			mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
+		// 			NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
+		// 			cursorLeft = 0;
+		// 		}
+		// 	} else {
+		// 		Unit* prev = Unit_Previous(unit);
+		// 		Unit* next = Unit_Next(unit);
+		// 		if (prev) {
+		// 			mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+		// 		} else if (next) {
+		// 			mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+		// 			cursorLeft = 1;
+		// 		}
 
-			if (cursorLeft) {
-				Unit* prev = Unit_Previous(unit);
-				Unit* next = Unit_Next(unit);
-				if (next) {
-					mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
-				} else if (prev) {
-					mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
-					cursorLeft = 0;
-				}
+		// 		NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
+		// 	}
+		// } else if (ctx->key_pressed & MU_KEY_DELETE) {
+		// 	ctx->key_pressed &= ~MU_KEY_DELETE;
 
-				NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
-			} else {
-				Unit* toDelete = Unit_Next(unit);
-				if (toDelete) {
-					Unit* destination = Unit_Next(toDelete);
-					mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
-					NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
-					cursorLeft = 1;
-				}
-			}
-		} else if (strlen(ctx->input_text) == 1) {
-			Unit* newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), *ctx->input_text);
-			NoUnionEx_AddUnit(unit->Parent, newUnit, (cursorLeft ? unit->Index : unit->Index + 1));
-			mu_set_focus(ctx, mu_get_id(ctx, &newUnit, sizeof(Unit*)));
-			cursorLeft = 0;
+		// 	if (cursorLeft) {
+		// 		Unit* prev = Unit_Previous(unit);
+		// 		Unit* next = Unit_Next(unit);
+		// 		if (next) {
+		// 			mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
+		// 		} else if (prev) {
+		// 			mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
+		// 			cursorLeft = 0;
+		// 		}
 
-			ctx->input_text[0] = 0;
-		} else if (ctx->key_pressed & MU_KEY_HOME) {
-			for (Unit* it = unit; it; it = Unit_Previous(it)) {
-				mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
-			}
-			cursorLeft = 1;
-		} else if (ctx->key_pressed & MU_KEY_END) {
-			for (Unit* it = unit; it; it = Unit_Next(it)) {
-				mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
-			}
-			cursorLeft = 0;
-		}
-	}
+		// 		NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
+		// 	} else {
+		// 		Unit* toDelete = Unit_Next(unit);
+		// 		if (toDelete) {
+		// 			Unit* destination = Unit_Next(toDelete);
+		// 			mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
+		// 			NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
+		// 			cursorLeft = 1;
+		// 		}
+		// 	}
+		// } else if (strlen(ctx->input_text) == 1) {
+		// 	Unit* newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), *ctx->input_text);
+		// 	NoUnionEx_AddUnit(unit->Parent, newUnit, (cursorLeft ? unit->Index : unit->Index + 1));
+		// 	mu_set_focus(ctx, mu_get_id(ctx, &newUnit, sizeof(Unit*)));
+		// 	cursorLeft = 0;
 
-	// again, because we may have changed the focus
-	if (ctx->focus == muid) {
-		// draw cursor
-		if (cursorLeft) {
-			mu_draw_rect(
-				ctx,
-				mu_rect(
-					contentsRect.x,
-					contentsRect.y + CURSOR_VERTICAL_PADDING,
-					CURSOR_THICKNESS,
-					contentsRect.h - CURSOR_VERTICAL_PADDING*2
-				),
-				COLOR_CURSOR
-			);
-		} else {
-			mu_draw_rect(
-				ctx,
-				mu_rect(
-					contentsRect.x + contentsRect.w - CURSOR_THICKNESS,
-					contentsRect.y + CURSOR_VERTICAL_PADDING,
-					CURSOR_THICKNESS,
-					contentsRect.h - CURSOR_VERTICAL_PADDING*2
-				),
-				COLOR_CURSOR
-			);
-		}
-	}
+		// 	ctx->input_text[0] = 0;
+		// } else if (ctx->key_pressed & MU_KEY_HOME) {
+		// 	for (Unit* it = unit; it; it = Unit_Previous(it)) {
+		// 		mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
+		// 	}
+		// 	cursorLeft = 1;
+		// } else if (ctx->key_pressed & MU_KEY_END) {
+		// 	for (Unit* it = unit; it; it = Unit_Next(it)) {
+		// 		mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
+		// 	}
+		// 	cursorLeft = 0;
+		// }
+	// }
 
 	int targetLeftHandleZoneWidth = shouldShowLeftHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;
 	int targetRightHandleZoneWidth = shouldShowRightHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;
@@ -836,8 +877,9 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 
 	if (ctx->mouse_released & MU_MOUSE_LEFT) {
 		if (mu_mouse_over(ctx, contentsRect) && unit->Contents->Type == RE_CONTENTS_LITCHAR) {
-			mu_set_focus(ctx, muid);
-			selection = (UnitRange) {0};
+			mu_set_focus(ctx, mu_get_id(ctx, &parent, sizeof(NoUnionEx*)));
+			parent->ClickedUnitIndex = unit->Index;
+			selection = (UnitRange) {0}; // TODO: Go away
 		}
 	}
 
@@ -1079,6 +1121,7 @@ void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth) {
 
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected) {
 	mu_Rect r = mu_rect(origin.x, origin.y, contents->Size.w, contents->Size.h);
+	contents->LastRect = r;
 
 	mu_Color backgroundColor = selected ? COLOR_SELECTED_BACKGROUND : mu_color(200, 200, 200, 255);
 

@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "vec.h"
+#include "textinput.h"
 
 #include "../microui.h"
 
@@ -53,6 +54,8 @@ typedef struct NoUnionEx {
 
     Vec2i Size;
     int WireHeight;
+    TextInputState TextState;
+    int ClickedUnitIndex;
 } NoUnionEx;
 
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index);
@@ -110,6 +113,7 @@ typedef struct UnitContents {
 
     Vec2i Size;
     int WireHeight;
+    mu_Rect LastRect;
 } UnitContents;
 
 typedef struct Group {
