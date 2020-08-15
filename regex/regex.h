@@ -134,6 +134,8 @@ typedef struct SetItem {
 
     struct LitChar* LitChar;
     struct SetItemRange* Range;
+
+    Vec2i Size;
 } SetItem;
 
 typedef struct SetItemRange {

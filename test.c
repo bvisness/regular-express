@@ -223,7 +223,11 @@ const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
 const int UNIT_REPEAT_WIRE_MARGIN = 5;
 const int UNIT_REPEAT_WIRE_SCOOT = 2;
 const int UNIT_CONTENTS_MIN_HEIGHT = 20;
+const int UNIT_CONTENTS_LITCHAR_WIDTH = 15;
 const int WIRE_THICKNESS = 2;
+const int SET_PADDING = 2;
+const int SET_HORIZONTAL_SPACING = 2;
+const int SET_DASH_WIDTH = 10;
 const int GROUP_VERTICAL_PADDING = 0;
 const int CURSOR_THICKNESS = 2;
 const int CURSOR_VERTICAL_PADDING = 2;
@@ -321,7 +325,7 @@ void prepass_Unit(Unit* unit) {
 void prepass_UnitContents(UnitContents* contents) {
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
-			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			contents->Size = (Vec2i) { .w = UNIT_CONTENTS_LITCHAR_WIDTH, .h = UNIT_CONTENTS_MIN_HEIGHT };
 			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_METACHAR: {
@@ -333,7 +337,30 @@ void prepass_UnitContents(UnitContents* contents) {
 			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_SET: {
-			contents->Size = (Vec2i) { .w = 80, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			Set* set = contents->Set;
+
+			Vec2i contentsSize = {0};
+
+			for (int i = 0; i < set->NumItems; i++) {
+				SetItem* item = set->Items[i];
+
+				if (item->Type == RE_SETITEM_LITCHAR) {
+					item->Size = (Vec2i) { .w = UNIT_CONTENTS_LITCHAR_WIDTH, .h = UNIT_CONTENTS_MIN_HEIGHT };
+				} else if (item->Type == RE_SETITEM_RANGE) {
+					item->Size = (Vec2i) {
+						.w = UNIT_CONTENTS_LITCHAR_WIDTH + SET_DASH_WIDTH + UNIT_CONTENTS_LITCHAR_WIDTH,
+						.h = UNIT_CONTENTS_MIN_HEIGHT,
+					};
+				}
+
+				contentsSize.w += (i > 0 ? SET_HORIZONTAL_SPACING : 0) + item->Size.w;
+				contentsSize.h = imax(contentsSize.h, item->Size.h);
+			}
+
+			contents->Size = (Vec2i) {
+				.w = SET_PADDING + contentsSize.w + SET_PADDING,
+				.h = SET_PADDING + contentsSize.h + SET_PADDING,
+			};
 			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_GROUP: {
@@ -360,6 +387,7 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth);
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth);
 void drawRailroad_Unit(Unit* unit, Vec2i origin, int depth);
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected);
+void drawRailroad_Set(Set* set, Vec2i origin);
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected);
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
@@ -1077,10 +1105,59 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 		case RE_CONTENTS_SET: {
 			// TODO: Set
 			mu_draw_rect(ctx, r, backgroundColor);
+			drawRailroad_Set(contents->Set, origin);
 		} break;
 		case RE_CONTENTS_GROUP: {
 			drawRailroad_Group(contents->Group, origin, unitDepth, selected);
 		} break;
+	}
+}
+
+void drawRailroad_Set(Set* set, Vec2i origin) {
+	// TODO: Selections
+
+	int itemX = origin.x + SET_PADDING;
+	int itemY = origin.y + SET_PADDING;
+
+	const char* dashStr = "-";
+
+	for (int i = 0; i < set->NumItems; i++) {
+		SetItem* item = set->Items[i];
+
+		mu_Rect itemRect = mu_rect(itemX, itemY, item->Size.w, item->Size.h);
+		mu_draw_rect(ctx, itemRect, mu_color(160, 160, 160, 255));
+
+		if (item->Type == RE_SETITEM_LITCHAR) {
+			mu_layout_set_next(ctx, itemRect, 0);
+			char* str = item->LitChar->_buf;
+			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
+		} else if (item->Type == RE_SETITEM_RANGE) {
+			{
+				mu_Rect r = mu_rect(itemX, itemY, UNIT_CONTENTS_LITCHAR_WIDTH, itemRect.h);
+				mu_layout_set_next(ctx, r, 0);
+				char* str = item->Range->Min->_buf;
+				mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+				draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
+			}
+
+			{
+				mu_Rect r = mu_rect(itemX + UNIT_CONTENTS_LITCHAR_WIDTH, itemY, SET_DASH_WIDTH, itemRect.h);
+				mu_layout_set_next(ctx, r, 0);
+				mu_Vec2 pos = mu_position_text(ctx, dashStr, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+				draw_arbitrary_text(ctx, dashStr, pos, COLOR_RE_TEXT);
+			}
+
+			{
+				mu_Rect r = mu_rect(itemX + UNIT_CONTENTS_LITCHAR_WIDTH + SET_DASH_WIDTH, itemY, UNIT_CONTENTS_LITCHAR_WIDTH, itemRect.h);
+				mu_layout_set_next(ctx, r, 0);
+				char* str = item->Range->Max->_buf;
+				mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+				draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
+			}
+		}
+
+		itemX += itemRect.w + SET_HORIZONTAL_SPACING;
 	}
 }
 
