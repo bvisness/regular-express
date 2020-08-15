@@ -234,7 +234,7 @@
 			window.addEventListener('keydown', e => {
 				if (e.key.length > 1) {
 					specialKeyEvent('down', e);
-				} else {
+				} else if (!e.ctrlKey) {
 					putString(test.exports.textInputBuf, e.key);
 					test.exports.textInput();
 				}

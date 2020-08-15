@@ -497,26 +497,58 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 	if (ctx->focus == muid) {
 		ctx->updated_focus = 1;
 
+		TextEditResult result = (TextEditResult) { .ResultState = ex->TextState };
+		int inputTextLength = strlen(ctx->input_text);
+
 		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-
 			ex->TextState = bumpCursor(ex->TextState, -1, 0); // TODO: Selection
 		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-
 			ex->TextState = bumpCursor(ex->TextState, 1, 0); // TODO: Selection
 		} else if (ctx->key_pressed & MU_KEY_HOME) {
 			ctx->key_pressed &= ~MU_KEY_HOME;
-
 			ex->TextState = setCursorPosition(ex->TextState, 0, 0); // TODO: Selection
 		} else if (ctx->key_pressed & MU_KEY_END) {
 			ctx->key_pressed &= ~MU_KEY_END;
-
 			ex->TextState = setCursorPosition(ex->TextState, ex->NumUnits, 0); // TODO: Selection
-		}
-	}
+		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
+			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+			result = deleteBackwards(ex->TextState);
+		} else if (ctx->key_pressed & MU_KEY_DELETE) {
+			ctx->key_pressed &= ~MU_KEY_DELETE;
+			result = deleteForwards(ex->TextState);
+		} else if (inputTextLength > 0) {
+			for (int i = 0; i < inputTextLength; i++) {
+				Unit* newUnit;
+				if (inputTextLength == 1 && ctx->input_text[0] == '[') {
+					newUnit = Unit_init(RE_NEW(Unit));
+					UnitContents_SetType(newUnit->Contents, RE_CONTENTS_SET);
+				} else {
+					newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[i]);
+				}
 
-	ex->TextState.CursorPosition = iclamp(ex->TextState.CursorPosition, 0, ex->NumUnits);
+				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.CursorPosition);
+				ex->TextState.CursorPosition++;
+
+				ctx->input_text[0] = 0;
+			}
+		}
+
+		if (result.DoDelete) {
+			result.DeleteMin = iclamp(result.DeleteMin, 0, ex->NumUnits);
+			result.DeleteMax = iclamp(result.DeleteMax, 0, ex->NumUnits);
+
+			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
+				NoUnionEx_RemoveUnit(ex, result.DeleteMin);
+			}
+
+			ex->TextState = result.ResultState;
+		}
+
+		// fix up cursor position
+		ex->TextState.CursorPosition = iclamp(ex->TextState.CursorPosition, 0, ex->NumUnits);
+	}
 
 	int unitX = origin.x;
 	for (int i = 0; i < ex->NumUnits; i++) {
@@ -762,105 +794,6 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth) {
 		isSelected
 	);
 
-	// if (ctx->focus == muid) {
-	// 	ctx->updated_focus = 1;
-
-		// if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
-		// 	ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-
-		// 	Unit* prev = Unit_Previous(unit);
-		// 	if (prev) {
-		// 		mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
-		// 	} else {
-		// 		cursorLeft = 1;
-		// 	}
-		// } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
-		// 	ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-
-		// 	if (unit->Contents->Type == RE_CONTENTS_SET) {
-		// 		cursorIndexInSet++;
-
-		// 		if (cursorIndexInSet >= unit->Contents->Set->NumItems) {
-		// 			// TODO: move to next unit
-		// 		} else {
-		// 			cursorIndexInSet = unit->Contents->Set->NumItems - 1;
-		// 		}
-		// 	} else {
-		// 		if (Unit_Previous(unit) && cursorLeft) {
-		// 			cursorLeft = 0;
-		// 		} else {
-		// 			Unit* next = Unit_Next(unit);
-		// 			if (next) {
-		// 				mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
-		// 			}
-		// 		}
-		// 	}
-		// } else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
-		// 	ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-
-		// 	if (cursorLeft) {
-		// 		Unit* toDelete = Unit_Previous(unit);
-		// 		if (toDelete) {
-		// 			Unit* destination = Unit_Previous(toDelete);
-		// 			mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
-		// 			NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
-		// 			cursorLeft = 0;
-		// 		}
-		// 	} else {
-		// 		Unit* prev = Unit_Previous(unit);
-		// 		Unit* next = Unit_Next(unit);
-		// 		if (prev) {
-		// 			mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
-		// 		} else if (next) {
-		// 			mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
-		// 			cursorLeft = 1;
-		// 		}
-
-		// 		NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
-		// 	}
-		// } else if (ctx->key_pressed & MU_KEY_DELETE) {
-		// 	ctx->key_pressed &= ~MU_KEY_DELETE;
-
-		// 	if (cursorLeft) {
-		// 		Unit* prev = Unit_Previous(unit);
-		// 		Unit* next = Unit_Next(unit);
-		// 		if (next) {
-		// 			mu_set_focus(ctx, mu_get_id(ctx, &next, sizeof(Unit*)));
-		// 		} else if (prev) {
-		// 			mu_set_focus(ctx, mu_get_id(ctx, &prev, sizeof(Unit*)));
-		// 			cursorLeft = 0;
-		// 		}
-
-		// 		NoUnionEx_RemoveUnit(unit->Parent, unit->Index);
-		// 	} else {
-		// 		Unit* toDelete = Unit_Next(unit);
-		// 		if (toDelete) {
-		// 			Unit* destination = Unit_Next(toDelete);
-		// 			mu_set_focus(ctx, mu_get_id(ctx, &destination, sizeof(Unit*)));
-		// 			NoUnionEx_RemoveUnit(toDelete->Parent, toDelete->Index);
-		// 			cursorLeft = 1;
-		// 		}
-		// 	}
-		// } else if (strlen(ctx->input_text) == 1) {
-		// 	Unit* newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), *ctx->input_text);
-		// 	NoUnionEx_AddUnit(unit->Parent, newUnit, (cursorLeft ? unit->Index : unit->Index + 1));
-		// 	mu_set_focus(ctx, mu_get_id(ctx, &newUnit, sizeof(Unit*)));
-		// 	cursorLeft = 0;
-
-		// 	ctx->input_text[0] = 0;
-		// } else if (ctx->key_pressed & MU_KEY_HOME) {
-		// 	for (Unit* it = unit; it; it = Unit_Previous(it)) {
-		// 		mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
-		// 	}
-		// 	cursorLeft = 1;
-		// } else if (ctx->key_pressed & MU_KEY_END) {
-		// 	for (Unit* it = unit; it; it = Unit_Next(it)) {
-		// 		mu_set_focus(ctx, mu_get_id(ctx, &it, sizeof(Unit*)));
-		// 	}
-		// 	cursorLeft = 0;
-		// }
-	// }
-
 	int targetLeftHandleZoneWidth = shouldShowLeftHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;
 	int targetRightHandleZoneWidth = shouldShowRightHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;
 
@@ -883,8 +816,11 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth) {
 		rect.h
 	);
 
-	if (ctx->mouse_released & MU_MOUSE_LEFT) {
-		if (mu_mouse_over(ctx, contentsRect) && unit->Contents->Type == RE_CONTENTS_LITCHAR) {
+	if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, contentsRect)) {
+		if (unit->Contents->Type == RE_CONTENTS_SET) {
+			// do nothing, let the set handle the click
+		} else {
+			ctx->mouse_released &= ~MU_MOUSE_LEFT;
 			mu_set_focus(ctx, mu_get_id(ctx, &parent, sizeof(NoUnionEx*)));
 			parent->ClickedUnitIndex = unit->Index;
 			selection = (UnitRange) {0}; // TODO: Go away
@@ -1128,6 +1064,8 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth) {
 }
 
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected) {
+	mu_Id muid = mu_get_id(ctx, &contents, sizeof(UnitContents*));
+
 	mu_Rect r = mu_rect(origin.x, origin.y, contents->Size.w, contents->Size.h);
 	contents->LastRect = r;
 
@@ -1165,6 +1103,8 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 }
 
 void drawRailroad_Set(Set* set, Vec2i origin) {
+	mu_Id muid = mu_get_id(ctx, &set, sizeof(Set*));
+
 	// TODO: Selections
 
 	int itemX = origin.x + SET_PADDING;
@@ -1208,7 +1148,141 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 			}
 		}
 
+		item->LastRect = itemRect;
+
 		itemX += itemRect.w + SET_HORIZONTAL_SPACING;
+
+		if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, itemRect)) {
+			ctx->mouse_released &= ~MU_MOUSE_LEFT;
+			mu_set_focus(ctx, muid);
+			set->TextState = setCursorPosition(set->TextState, i, 0); // TODO: Selection
+		}
+	}
+
+	if (ctx->focus == muid) {
+		ctx->updated_focus = 1;
+
+		// Draw cursor according to what we have _now_
+		SetItem* cursorItem;
+		int cursorRight = 0;
+		if (set->TextState.CursorPosition >= set->NumItems) {
+			cursorItem = set->Items[set->NumItems - 1];
+			cursorRight = 1;
+		} else {
+			cursorItem = set->Items[set->TextState.CursorPosition];
+		}
+
+		mu_Rect itemRect = cursorItem->LastRect;
+
+		if (cursorRight) {
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					itemRect.x + itemRect.w - CURSOR_THICKNESS,
+					itemRect.y + CURSOR_VERTICAL_PADDING,
+					CURSOR_THICKNESS,
+					itemRect.h - CURSOR_VERTICAL_PADDING*2
+				),
+				COLOR_CURSOR
+			);
+		} else {
+			mu_draw_rect(
+				ctx,
+				mu_rect(
+					itemRect.x,
+					itemRect.y + CURSOR_VERTICAL_PADDING,
+					CURSOR_THICKNESS,
+					itemRect.h - CURSOR_VERTICAL_PADDING*2
+				),
+				COLOR_CURSOR
+			);
+		}
+
+		// Handle keyboard input to set up for next frame
+		TextEditResult result = {0};
+		int inputTextLength = strlen(ctx->input_text);
+		SetItem* itemBeforeCursor = (set->TextState.CursorPosition > 0
+			? set->Items[set->TextState.CursorPosition - 1]
+			: NULL
+		);
+		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+			set->TextState = bumpCursor(set->TextState, -1, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+			set->TextState = bumpCursor(set->TextState, 1, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_HOME) {
+			ctx->key_pressed &= ~MU_KEY_HOME;
+			set->TextState = setCursorPosition(set->TextState, 0, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_END) {
+			ctx->key_pressed &= ~MU_KEY_END;
+			set->TextState = setCursorPosition(set->TextState, set->NumItems, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
+			if (
+				itemBeforeCursor
+				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
+				&& itemBeforeCursor->Range->Max->C != 0
+			) {
+				itemBeforeCursor->Range->Max->C = 0;
+			} else if (
+				itemBeforeCursor
+				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
+				&& itemBeforeCursor->Range->Max->C == 0
+			) {
+				itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
+				itemBeforeCursor->LitChar->C = itemBeforeCursor->Range->Min->C;
+			} else {
+				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+				result = deleteBackwards(set->TextState);
+			}
+		} else if (ctx->key_pressed & MU_KEY_DELETE) {
+			ctx->key_pressed &= ~MU_KEY_DELETE;
+			result = deleteForwards(set->TextState);
+		} else if (inputTextLength > 0) {
+			for (int i = 0; i < inputTextLength; i++) {
+				do {
+					if (inputTextLength == 1) {
+						if (
+							ctx->input_text[i] == '-'
+							&& itemBeforeCursor
+							&& itemBeforeCursor->Type != RE_SETITEM_RANGE
+						) {
+							itemBeforeCursor->Type = RE_SETITEM_RANGE;
+							itemBeforeCursor->Range->Min->C = itemBeforeCursor->LitChar->C;
+							break;
+						}
+
+						if (
+							itemBeforeCursor
+							&& itemBeforeCursor->Type == RE_SETITEM_RANGE
+							&& itemBeforeCursor->Range->Max->C == 0
+						) {
+							itemBeforeCursor->Range->Max->C = ctx->input_text[i];
+							break;
+						}
+					}
+
+					SetItem* newItem = SetItem_init(RE_NEW(SetItem));
+					newItem->LitChar->C = ctx->input_text[i];
+					Set_AddItem(set, newItem, set->TextState.CursorPosition);
+					set->TextState.CursorPosition++;
+				} while (0);
+			}
+		}
+
+		if (result.DoDelete) {
+			result.DeleteMin = iclamp(result.DeleteMin, 0, set->NumItems);
+			result.DeleteMax = iclamp(result.DeleteMax, 0, set->NumItems);
+
+			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
+				Set_RemoveItem(set, result.DeleteMin);
+			}
+
+			set->TextState = result.ResultState;
+		}
+
+		// fix up cursor position
+		set->TextState.CursorPosition = iclamp(set->TextState.CursorPosition, 0, set->NumItems);
 	}
 }
 

@@ -129,9 +129,13 @@ typedef struct Set {
     struct SetItem* Items[MAX_SET_ITEMS];
 
     int IsNegative;
+    TextInputState TextState;
 
     Vec2i Size;
 } Set;
+
+void Set_AddItem(Set* set, struct SetItem* item, int index);
+struct SetItem* Set_RemoveItem(Set* set, int index);
 
 typedef struct SetItem {
     int Type;
@@ -140,6 +144,7 @@ typedef struct SetItem {
     struct SetItemRange* Range;
 
     Vec2i Size;
+    mu_Rect LastRect;
 } SetItem;
 
 typedef struct SetItemRange {

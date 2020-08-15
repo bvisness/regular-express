@@ -17,9 +17,6 @@ typedef struct TextEditResult {
     int DeleteMin;
     int DeleteMax;
 
-    int DoInsert;
-    int InsertAt;
-
     TextInputState ResultState;
 } TextEditResult;
 

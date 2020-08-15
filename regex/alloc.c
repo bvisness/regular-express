@@ -49,7 +49,6 @@ UnitContents* UnitContents_init(UnitContents* contents) {
 }
 
 LitChar* LitChar_init(LitChar* c) {
-	c->C = 'a';
 	return c;
 }
 

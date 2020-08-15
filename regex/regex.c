@@ -158,6 +158,45 @@ int Unit_ShouldShowRightHandle(Unit* unit) {
     return 0;
 }
 
+void Set_AddItem(Set* set, struct SetItem* item, int index) {
+    assert(set->NumItems < MAX_SET_ITEMS);
+
+    if (index < 0) {
+        set->Items[set->NumItems] = item;
+        set->NumItems++;
+
+        return;
+    }
+
+    // shift units over
+    for (int i = set->NumItems - 1; i >= index; i--) {
+        set->Items[i + 1] = set->Items[i];
+    }
+
+    set->Items[index] = item;
+    set->NumItems++;
+}
+
+struct SetItem* Set_RemoveItem(Set* set, int index) {
+    assert(set->NumItems > 0);
+
+    if (index == -1) {
+        set->NumItems--;
+        SetItem* item = set->Items[set->NumItems];
+        return item;
+    }
+
+    SetItem* item = set->Items[index];
+
+    set->NumItems--;
+    for (int i = index; i < set->NumItems; i++) {
+        set->Items[i] = set->Items[i + 1];
+    }
+
+    return item;
+}
+
+
 char* toString_Regex(char* base, Regex* regex);
 char* toString_NoUnionEx(char* base, NoUnionEx* ex);
 char* toString_Unit(char* base, Unit* unit);

@@ -117,9 +117,6 @@ TextEditResult insertString(TextInputState state) {
         insertAt = result.DeleteMin;
     }
 
-    result.DoInsert = 1;
-    result.InsertAt = insertAt;
-
     result.ResultState = (TextInputState) {
         .CursorPosition = insertAt,
         .SelectionBase = -1,
