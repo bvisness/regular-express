@@ -241,8 +241,21 @@ mu_Id mu_get_id(mu_Context *ctx, const void *data, int size) {
 }
 
 
+mu_Id mu_get_id_noidstack(mu_Context *ctx, const void *data, int size) {
+  mu_Id res = HASH_INITIAL;
+  hash(&res, data, size);
+  ctx->last_id = res;
+  return res;
+}
+
+
 void mu_push_id(mu_Context *ctx, const void *data, int size) {
   push(ctx->id_stack, mu_get_id(ctx, data, size));
+}
+
+
+void mu_push_id_raw(mu_Context *ctx, mu_Id id) {
+  push(ctx->id_stack, id);
 }
 
 

@@ -237,6 +237,7 @@
 				} else if (!e.ctrlKey) {
 					putString(test.exports.textInputBuf, e.key);
 					test.exports.textInput();
+					e.preventDefault();
 				}
 				window.requestAnimationFrame(doFrame);
 			});
