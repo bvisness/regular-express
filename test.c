@@ -505,6 +505,14 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
 
 			ex->TextState = bumpCursor(ex->TextState, 1, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_HOME) {
+			ctx->key_pressed &= ~MU_KEY_HOME;
+
+			ex->TextState = setCursorPosition(ex->TextState, 0, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_END) {
+			ctx->key_pressed &= ~MU_KEY_END;
+
+			ex->TextState = setCursorPosition(ex->TextState, ex->NumUnits, 0); // TODO: Selection
 		}
 	}
 
