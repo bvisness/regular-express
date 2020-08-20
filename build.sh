@@ -10,7 +10,7 @@ which wasm-ld-10 && wasmld="wasm-ld-10"
 
 wat2wasm sys.wat
 
-flags="--target=wasm32 -c -O2 -flto -nostdlib -I fakestdlib -Wno-builtin-requires-header"
+flags="--target=wasm32 -c -O2 -flto -nostdlib -I fakestdlib -Wall -Wno-builtin-requires-header"
 
 $clang $flags -o stb_sprintf.o fakestdlib/stb_sprintf.c
 $clang $flags -o stdio.o fakestdlib/stdio.c

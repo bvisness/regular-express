@@ -18,7 +18,7 @@ TextInputState fixupState(TextInputState state) {
     return state;
 }
 
-TextInputState setCursorPosition(TextInputState state, int i, int select) {
+TextInputState TextState_SetCursorPosition(TextInputState state, int i, int select) {
     TextInputState result;
 
     if (select) {
@@ -36,23 +36,35 @@ TextInputState setCursorPosition(TextInputState state, int i, int select) {
     return fixupState(result);
 }
 
-TextInputState moveCursor(TextInputState state, int delta, int select) {
-    return setCursorPosition(state, state.CursorPosition + delta, select);
+TextInputState TextState_MoveCursor(TextInputState state, int delta, int select) {
+    return TextState_SetCursorPosition(state, state.CursorPosition + delta, select);
 }
 
-TextInputState bumpCursor(TextInputState state, int direction, int select) {
+TextInputState TextState_BumpCursor(TextInputState state, int direction, int select) {
     if (!select && state.SelectionBase != -1) {
         int destination = (direction > 0
             ? imax(state.CursorPosition, state.SelectionBase)
             : imin(state.CursorPosition, state.SelectionBase)
         );
-        return setCursorPosition(state, destination, 0);
+        return TextState_SetCursorPosition(state, destination, 0);
     }
 
-    return moveCursor(state, (direction > 0 ? 1 : -1), select);
+    return TextState_MoveCursor(state, (direction > 0 ? 1 : -1), select);
 }
 
-int isSelected(TextInputState state, int index) {
+int TextState_IsSelecting(TextInputState state) {
+    return state.SelectionBase != -1;
+}
+
+int TextState_SelectionStart(TextInputState state) {
+    return imin(state.CursorPosition, state.SelectionBase);
+}
+
+int TextState_SelectionEnd(TextInputState state) {
+    return imax(state.CursorPosition, state.SelectionBase) - 1;
+}
+
+int TextState_IsSelected(TextInputState state, int index) {
     if (state.SelectionBase == -1) {
         return 0;
     }
@@ -62,7 +74,7 @@ int isSelected(TextInputState state, int index) {
     return min <= index && index < max;
 }
 
-TextEditResult deleteBackwards(TextInputState state) {
+TextEditResult TextState_DeleteBackwards(TextInputState state) {
     TextEditResult result = {0};
 
     result.DoDelete = 1;
@@ -88,7 +100,7 @@ TextEditResult deleteBackwards(TextInputState state) {
     return result;
 }
 
-TextEditResult deleteForwards(TextInputState state) {
+TextEditResult TextState_DeleteForwards(TextInputState state) {
     TextEditResult result = {0};
 
     result.DoDelete = 1;
@@ -114,7 +126,7 @@ TextEditResult deleteForwards(TextInputState state) {
     return result;
 }
 
-TextEditResult insertString(TextInputState state) {
+TextEditResult TextState_InsertString(TextInputState state) {
     TextEditResult result = {0};
 
     int insertAt = state.CursorPosition;

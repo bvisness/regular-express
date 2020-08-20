@@ -89,17 +89,13 @@ enum {
 };
 
 typedef struct UnitRange {
-	Unit* StartUnit;
-	Unit* EndUnit;
+	NoUnionEx* Ex;
+	int Start;
+	int End;
 } UnitRange;
 
-UnitRange selection;
-
-#define ITER_UnitRange(range, it) for ( 										\
-	Unit *(it) = (range).StartUnit, *__next = Unit_Next((range).StartUnit); 	\
-	(it); 																		\
-	(it) = ((it) == (range).EndUnit) ? NULL : __next, __next = Unit_Next(it) 	\
-)
+// TODO: UnitRange Helper
+// Make functions for getting the first and last units, for convenience.
 
 enum {
 	DRAG_TYPE_NONE,
@@ -129,8 +125,8 @@ typedef struct DragBoxSelect {
 	Vec2i StartPos;
 	mu_Rect Rect;
 
-	UnitRange CurrentSelection;
 	PotentialSelect Potentials[MAX_POTENTIAL_SELECTS];
+	UnitRange Result;
 } DragBoxSelect;
 
 typedef struct DragMoveUnits {
@@ -161,29 +157,22 @@ typedef struct DragContext {
 DragContext drag;
 
 void MoveUnitsTo(UnitRange range, NoUnionEx* ex, int startIndex) {
-	int i = startIndex;
-	ITER_UnitRange(range, it) {
-		NoUnionEx_RemoveUnit(it->Parent, it->Index);
-		it->Parent = NULL;
-		NoUnionEx_AddUnit(ex, it, i);
-		if (i != -1) {
-			i++;
-		}
+	for (int i = 0; i <= range.End - range.Start; i++) {
+		Unit* unit = range.Ex->Units[range.Start]; // grab head of range
+		NoUnionEx_RemoveUnit(range.Ex, range.Start);
+		NoUnionEx_AddUnit(ex, unit, startIndex + i);
 	}
 }
 
 // TODO: Please move this somewhere else. This is all way too big.
 Unit* ConvertRangeToGroup(UnitRange range) {
-	NoUnionEx* parent = range.StartUnit->Parent;
-	int startIndex = range.StartUnit->Index;
-
 	Unit* newUnit = Unit_init(RE_NEW(Unit));
 	UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
 
 	NoUnionEx* ex = newUnit->Contents->Group->Regex->UnionMembers[0];
-	MoveUnitsTo(range, ex, -1);
+	MoveUnitsTo(range, ex, 0);
 
-	NoUnionEx_AddUnit(parent, newUnit, startIndex);
+	NoUnionEx_AddUnit(range.Ex, newUnit, range.Start);
 
 	return newUnit;
 }
@@ -291,22 +280,22 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 
 		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-			ex->TextState = bumpCursor(ex->TextState, -1, doSelection);
+			ex->TextState = TextState_BumpCursor(ex->TextState, -1, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-			ex->TextState = bumpCursor(ex->TextState, 1, doSelection);
+			ex->TextState = TextState_BumpCursor(ex->TextState, 1, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_HOME) {
 			ctx->key_pressed &= ~MU_KEY_HOME;
-			ex->TextState = setCursorPosition(ex->TextState, 0, doSelection);
+			ex->TextState = TextState_SetCursorPosition(ex->TextState, 0, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_END) {
 			ctx->key_pressed &= ~MU_KEY_END;
-			ex->TextState = setCursorPosition(ex->TextState, ex->NumUnits, doSelection);
+			ex->TextState = TextState_SetCursorPosition(ex->TextState, ex->NumUnits, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
 			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-			result = deleteBackwards(ex->TextState);
+			result = TextState_DeleteBackwards(ex->TextState);
 		} else if (ctx->key_pressed & MU_KEY_DELETE) {
 			ctx->key_pressed &= ~MU_KEY_DELETE;
-			result = deleteForwards(ex->TextState);
+			result = TextState_DeleteForwards(ex->TextState);
 		} else if (inputTextLength > 1) {
 			// assume we are pasting and want to parse a regex
 			// TODO: We should probably explicitly detect that we are pasting.
@@ -466,7 +455,7 @@ void prepass_Group(Group* group) {
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth);
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth);
-void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, int isSelected);
+void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, UnitRange* selection);
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected);
 void drawRailroad_Set(Set* set, Vec2i origin);
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected);
@@ -578,6 +567,25 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 
 	ex->ClickedUnitIndex = -1;
 
+	// check if we were selected by a box select
+	if (drag.Type == DRAG_TYPE_BOX_SELECT && drag.BoxSelect.Result.Ex == ex) {
+		mu_set_focus(ctx, muid);
+		ex->TextState = (TextInputState) {
+			.SelectionBase = drag.BoxSelect.Result.Start,
+			.CursorPosition = drag.BoxSelect.Result.End + 1,
+		};
+		drag.BoxSelect.Result = (UnitRange) {0};
+	}
+
+	UnitRange selection = {0};
+	if (ctx->focus == muid && TextState_IsSelecting(ex->TextState)) {
+		selection = (UnitRange) {
+			.Ex = ex,
+			.Start = TextState_SelectionStart(ex->TextState),
+			.End = TextState_SelectionEnd(ex->TextState),
+		};
+	}
+
 	int unitX = origin.x;
 	for (int i = 0; i < ex->NumUnits; i++) {
 		Unit* unit = ex->Units[i];
@@ -590,14 +598,14 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 				.y = origin.y + ex->WireHeight - unit->WireHeight,
 			},
 			unitDepth,
-			ctx->focus == muid ? isSelected(ex->TextState, i) : 0
+			selection.Ex ? &selection : NULL
 		);
 
 		unitX += unit->Size.w;
 	}
 
 	if (ex->ClickedUnitIndex != -1) {
-		ex->TextState = setCursorPosition(ex->TextState, ex->ClickedUnitIndex, ctx->key_down & MU_KEY_SHIFT);
+		ex->TextState = TextState_SetCursorPosition(ex->TextState, ex->ClickedUnitIndex, ctx->key_down & MU_KEY_SHIFT);
 	}
 
 	if (ctx->focus == muid) {
@@ -636,10 +644,24 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 				COLOR_CURSOR
 			);
 		}
+
+		// draw floating UI
+		if (selection.Ex) {
+			// selection bounding box
+			// TODO: UnitRange Helper
+			mu_Rect sbb = selection.Ex->Units[selection.Start]->LastRect; // TODO: Actually get the bounding box of the whole selection
+
+			const int BUTTON_WIDTH = 100;
+
+			mu_layout_set_next(ctx, mu_rect(sbb.x + sbb.w/2 - BUTTON_WIDTH/2, sbb.y - 20, BUTTON_WIDTH, 20), 0);
+			if (!drag.Type && mu_button(ctx, "Make Group")) {
+				ConvertRangeToGroup(selection);
+			}
+		}
 	}
 }
 
-void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, int isSelected) {
+void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, UnitRange* selection) {
 	mu_Id muid = mu_get_id(ctx, &unit, sizeof(Unit*));
 
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
@@ -649,6 +671,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 		|| (drag.Type == DRAG_TYPE_CREATE_UNION && drag.CreateUnion.OriginUnit == unit)
 	);
 	int nonSingular = Unit_IsNonSingular(unit);
+	int isSelected = selection ? TextState_IsSelected(parent->TextState, unit->Index) : 0;
 
 	mu_Rect contentsRect = mu_rect(
 		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
@@ -845,7 +868,6 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 			ctx->mouse_released &= ~MU_MOUSE_LEFT;
 			mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parent, sizeof(NoUnionEx*)));
 			parent->ClickedUnitIndex = unit->Index;
-			selection = (UnitRange) {0}; // TODO: Go away
 		}
 	}
 
@@ -854,9 +876,13 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 			// maybe start drag
 			if (overLeftHandle) {
 				if (ctx->key_down & MU_KEY_CTRL) {
-					UnitRange units = (UnitRange) { .StartUnit = unit, .EndUnit = unit };
-					if (units.StartUnit == selection.StartUnit) {
-						units = selection;
+					UnitRange units = (UnitRange) {
+						.Ex = parent,
+						.Start = unit->Index,
+						.End = unit->Index,
+					};
+					if (selection && selection->Start == units.Start) {
+						units = *selection;
 					}
 
 					drag = (DragContext) {
@@ -882,9 +908,13 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 				if (ctx->key_down & MU_KEY_CTRL) {
 					Unit* next = Unit_Next(unit);
 					if (next) {
-						UnitRange units = (UnitRange) { .StartUnit = next, .EndUnit = next };
-						if (units.StartUnit == selection.StartUnit) {
-							units = selection;
+						UnitRange units = (UnitRange) {
+							.Ex = parent,
+							.Start = next->Index,
+							.End = next->Index,
+						};
+						if (selection && selection->Start == units.Start) {
+							units = *selection;
 						}
 
 						drag = (DragContext) {
@@ -910,32 +940,23 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 			} else if (mu_mouse_over(ctx, contentsRect)) {
 				moveUnitsEx = (NoUnionEx) {0};
 
-				int numUnits = 1;
-				Unit* startUnit = unit;
+				UnitRange unitsToMove = (UnitRange) {
+					.Ex = parent,
+					.Start = unit->Index,
+					.End = unit->Index,
+				};
 
-				if (selection.StartUnit && isSelected) {
-					startUnit = selection.StartUnit;
-					numUnits = 0;
-					ITER_UnitRange(selection, it) {
-						numUnits++;
-					}
+				if (isSelected) {
+					unitsToMove = *selection;
 				}
 
-				NoUnionEx* originEx = startUnit->Parent;
-				int originIndex = startUnit->Index;
-
-				for (int i = 0; i < numUnits; i++) {
-					Unit* addedUnit = originEx->Units[originIndex];
-					Unit* removedUnit = NoUnionEx_RemoveUnit(originEx, originIndex);
-					NoUnionEx_AddUnit(&moveUnitsEx, addedUnit, -1);
-					assert(addedUnit == removedUnit)
-				}
+				MoveUnitsTo(unitsToMove, &moveUnitsEx, 0);
 
 				drag = (DragContext) {
 					.Type = DRAG_TYPE_MOVE_UNITS,
 					.MoveUnits = (DragMoveUnits) {
-						.OriginEx = originEx,
-						.OriginIndex = originIndex,
+						.OriginEx = parent,
+						.OriginIndex = unitsToMove.Start,
 					},
 				};
 			}
@@ -966,8 +987,11 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 						(unit == visitingUnit && overLeftHandle)
 						|| (Unit_Next(unit) == visitingUnit && overRightHandle)
 					) {
-						groupUnits.StartUnit = visitingUnit;
-						groupUnits.EndUnit = drag.Wire.UnitBeforeHandle;
+						groupUnits = (UnitRange) {
+							.Ex = parent,
+							.Start = visitingUnit->Index,
+							.End = drag.Wire.UnitBeforeHandle->Index,
+						};
 						isForward = 0;
 						break;
 					}
@@ -984,27 +1008,28 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 						(unit == visitingUnit && overRightHandle)
 						|| (Unit_Previous(unit) == visitingUnit && overLeftHandle)
 					) {
-						groupUnits.StartUnit = drag.Wire.UnitAfterHandle;
-						groupUnits.EndUnit = visitingUnit;
+						groupUnits = (UnitRange) {
+							.Ex = parent,
+							.Start = drag.Wire.UnitAfterHandle->Index,
+							.End = visitingUnit->Index,
+						};
 						isForward = 1;
 						break;
 					}
 				}
 			}
 
-			if (groupUnits.StartUnit) {
-				assert(groupUnits.EndUnit);
-
+			if (groupUnits.Ex) {
 				didHandleDrag = 1;
 
-				if (groupUnits.StartUnit == groupUnits.EndUnit) {
+				if (groupUnits.Start == groupUnits.End) {
 					// drag onto this same unit. no group shenanigans!
 					if (isForward) {
 						// forward drag, skip
-						Unit_SetRepeatMin(groupUnits.StartUnit, 0);
+						Unit_SetRepeatMin(groupUnits.Ex->Units[groupUnits.Start], 0);
 					} else {
 						// backward drag, repeat
-						Unit_SetRepeatMax(groupUnits.StartUnit, 0);
+						Unit_SetRepeatMax(groupUnits.Ex->Units[groupUnits.Start], 0);
 					}
 				} else {
 					Unit* newUnit = ConvertRangeToGroup(groupUnits);
@@ -1062,20 +1087,21 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, i
 				&& !rect_contains(rect, drag.BoxSelect.Rect)
 			) {
 				PotentialSelect* potential = &drag.BoxSelect.Potentials[depth];
-				if (!potential->Range.StartUnit) {
+				if (!potential->Range.Ex) {
 					// initialize a selection at this level
 					(*potential) = (PotentialSelect) {
 						.Valid = 1,
 						.Range = (UnitRange) {
-							.StartUnit = unit,
-							.EndUnit = unit,
+							.Ex = parent,
+							.Start = unit->Index,
+							.End = unit->Index,
 						},
 					};
 				} else {
 					// we already have a selection at this level;
 					// either continue it or destroy it
-					if (potential->Range.EndUnit == Unit_Previous(unit)) {
-						potential->Range.EndUnit = unit;
+					if (Unit_Previous(unit) && potential->Range.End == Unit_Previous(unit)->Index) { // TODO: This check feels very wrong but I don't feel like understanding it right now.
+						potential->Range.End = unit->Index;
 					} else {
 						potential->Valid = 0;
 					}
@@ -1177,7 +1203,7 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 		if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, itemRect)) {
 			ctx->mouse_released &= ~MU_MOUSE_LEFT;
 			mu_set_focus(ctx, muid);
-			set->TextState = setCursorPosition(set->TextState, i, 0); // TODO: Selection
+			set->TextState = TextState_SetCursorPosition(set->TextState, i, 0); // TODO: Selection
 		}
 	}
 
@@ -1229,16 +1255,16 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 		);
 		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-			set->TextState = bumpCursor(set->TextState, -1, 0); // TODO: Selection
+			set->TextState = TextState_BumpCursor(set->TextState, -1, 0); // TODO: Selection
 		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-			set->TextState = bumpCursor(set->TextState, 1, 0); // TODO: Selection
+			set->TextState = TextState_BumpCursor(set->TextState, 1, 0); // TODO: Selection
 		} else if (ctx->key_pressed & MU_KEY_HOME) {
 			ctx->key_pressed &= ~MU_KEY_HOME;
-			set->TextState = setCursorPosition(set->TextState, 0, 0); // TODO: Selection
+			set->TextState = TextState_SetCursorPosition(set->TextState, 0, 0); // TODO: Selection
 		} else if (ctx->key_pressed & MU_KEY_END) {
 			ctx->key_pressed &= ~MU_KEY_END;
-			set->TextState = setCursorPosition(set->TextState, set->NumItems, 0); // TODO: Selection
+			set->TextState = TextState_SetCursorPosition(set->TextState, set->NumItems, 0); // TODO: Selection
 		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
 			if (
 				itemBeforeCursor
@@ -1255,11 +1281,11 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 				itemBeforeCursor->LitChar->C = itemBeforeCursor->Range->Min->C;
 			} else {
 				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-				result = deleteBackwards(set->TextState);
+				result = TextState_DeleteBackwards(set->TextState);
 			}
 		} else if (ctx->key_pressed & MU_KEY_DELETE) {
 			ctx->key_pressed &= ~MU_KEY_DELETE;
-			result = deleteForwards(set->TextState);
+			result = TextState_DeleteForwards(set->TextState);
 		} else if (inputTextLength > 0) {
 			for (int i = 0; i < inputTextLength; i++) {
 				do {
@@ -1390,7 +1416,7 @@ int frame(float dt) {
 					}
 				}
 
-				selection = newSelection;
+				drag.BoxSelect.Result = newSelection;
 				for (int i = 0; i < MAX_POTENTIAL_SELECTS; i++) {
 					drag.BoxSelect.Potentials[i] = (PotentialSelect) {0};
 				}
@@ -1431,27 +1457,6 @@ int frame(float dt) {
 					),
 					COLOR_WIRE
 				);
-			}
-		}
-
-		if (ctx->key_pressed & (MU_KEY_BACKSPACE | MU_KEY_DELETE) && selection.StartUnit) {
-			NoUnionEx* ex = selection.StartUnit->Parent;
-			int startIndex = selection.StartUnit->Index;
-			ITER_UnitRange(selection, it) {
-				NoUnionEx_RemoveUnit(ex, startIndex);
-			}
-		}
-
-		// draw floating UI
-		if (selection.StartUnit) {
-			// selection bounding box
-			mu_Rect sbb = selection.StartUnit->LastRect;
-
-			const int BUTTON_WIDTH = 100;
-
-			mu_layout_set_next(ctx, mu_rect(sbb.x + sbb.w/2 - BUTTON_WIDTH/2, sbb.y - 20, BUTTON_WIDTH, 20), 0);
-			if (!drag.Type && mu_button(ctx, "Make Group")) {
-				ConvertRangeToGroup(selection);
 			}
 		}
 

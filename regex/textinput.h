@@ -8,11 +8,14 @@ typedef struct TextInputState {
 
 extern const TextInputState DEFAULT_TEXT_INPUT_STATE;
 
-TextInputState setCursorPosition(TextInputState state, int i, int select);
-TextInputState moveCursor(TextInputState state, int delta, int select);
-TextInputState bumpCursor(TextInputState state, int direction, int select);
+TextInputState TextState_SetCursorPosition(TextInputState state, int i, int select);
+TextInputState TextState_MoveCursor(TextInputState state, int delta, int select);
+TextInputState TextState_BumpCursor(TextInputState state, int direction, int select);
 
-int isSelected(TextInputState state, int index);
+int TextState_IsSelecting(TextInputState state);
+int TextState_SelectionStart(TextInputState state);
+int TextState_SelectionEnd(TextInputState state);
+int TextState_IsSelected(TextInputState state, int index);
 
 typedef struct TextEditResult {
     int DoDelete;
@@ -22,8 +25,8 @@ typedef struct TextEditResult {
     TextInputState ResultState;
 } TextEditResult;
 
-TextEditResult deleteBackwards(TextInputState state);
-TextEditResult deleteForwards(TextInputState state);
-TextEditResult insertString(TextInputState state);
+TextEditResult TextState_DeleteBackwards(TextInputState state);
+TextEditResult TextState_DeleteForwards(TextInputState state);
+TextEditResult TextState_InsertString(TextInputState state);
 
 #endif
