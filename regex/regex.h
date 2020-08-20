@@ -171,8 +171,6 @@ typedef struct MetaChar {
     };
 } MetaChar;
 
-
 char* ToString(Regex* regex);
-
 
 #endif

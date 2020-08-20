@@ -1,5 +1,7 @@
 #include "regex.h"
 
+const char* SPECIAL_CHARACTERS = "()[]{}*+?.\\|";
+
 void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
     regex->UnionMembers[regex->NumUnionMembers] = ex;
     regex->NumUnionMembers++;
@@ -415,6 +417,15 @@ char* toString_Special(char* base, Special* special) {
 char* toString_LitChar(char* base, LitChar* c) {
     if (c == NULL) {
         return base;
+    }
+
+    int specialLen = strlen(SPECIAL_CHARACTERS);
+    for (int i = 0; i < specialLen; i++) {
+        if (c->C == SPECIAL_CHARACTERS[i]) {
+            *base = '\\';
+            base++;
+            break;
+        }
     }
 
     *base = c->C;
