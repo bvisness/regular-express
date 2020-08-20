@@ -52,6 +52,16 @@ TextInputState bumpCursor(TextInputState state, int direction, int select) {
     return moveCursor(state, (direction > 0 ? 1 : -1), select);
 }
 
+int isSelected(TextInputState state, int index) {
+    if (state.SelectionBase == -1) {
+        return 0;
+    }
+
+    int min = imin(state.CursorPosition, state.SelectionBase);
+    int max = imax(state.CursorPosition, state.SelectionBase);
+    return min <= index && index < max;
+}
+
 TextEditResult deleteBackwards(TextInputState state) {
     TextEditResult result = {0};
 

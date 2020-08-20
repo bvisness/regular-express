@@ -12,6 +12,8 @@ TextInputState setCursorPosition(TextInputState state, int i, int select);
 TextInputState moveCursor(TextInputState state, int delta, int select);
 TextInputState bumpCursor(TextInputState state, int direction, int select);
 
+int isSelected(TextInputState state, int index);
+
 typedef struct TextEditResult {
     int DoDelete;
     int DeleteMin;

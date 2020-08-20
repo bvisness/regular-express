@@ -287,18 +287,20 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 		TextEditResult result = (TextEditResult) { .ResultState = ex->TextState };
 		int inputTextLength = strlen(ctx->input_text);
 
+		int doSelection = ctx->key_down & MU_KEY_SHIFT;
+
 		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-			ex->TextState = bumpCursor(ex->TextState, -1, 0); // TODO: Selection
+			ex->TextState = bumpCursor(ex->TextState, -1, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-			ex->TextState = bumpCursor(ex->TextState, 1, 0); // TODO: Selection
+			ex->TextState = bumpCursor(ex->TextState, 1, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_HOME) {
 			ctx->key_pressed &= ~MU_KEY_HOME;
-			ex->TextState = setCursorPosition(ex->TextState, 0, 0); // TODO: Selection
+			ex->TextState = setCursorPosition(ex->TextState, 0, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_END) {
 			ctx->key_pressed &= ~MU_KEY_END;
-			ex->TextState = setCursorPosition(ex->TextState, ex->NumUnits, 0); // TODO: Selection
+			ex->TextState = setCursorPosition(ex->TextState, ex->NumUnits, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
 			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 			result = deleteBackwards(ex->TextState);
@@ -464,7 +466,7 @@ void prepass_Group(Group* group) {
 
 void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth);
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth);
-void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth);
+void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, int isSelected);
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected);
 void drawRailroad_Set(Set* set, Vec2i origin);
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected);
@@ -579,6 +581,7 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 	int unitX = origin.x;
 	for (int i = 0; i < ex->NumUnits; i++) {
 		Unit* unit = ex->Units[i];
+
 		drawRailroad_Unit(
 			unit,
 			ex,
@@ -586,14 +589,15 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 				.x = unitX,
 				.y = origin.y + ex->WireHeight - unit->WireHeight,
 			},
-			unitDepth
+			unitDepth,
+			ctx->focus == muid ? isSelected(ex->TextState, i) : 0
 		);
 
 		unitX += unit->Size.w;
 	}
 
 	if (ex->ClickedUnitIndex != -1) {
-		ex->TextState = setCursorPosition(ex->TextState, ex->ClickedUnitIndex, 0); // TODO: Selection
+		ex->TextState = setCursorPosition(ex->TextState, ex->ClickedUnitIndex, ctx->key_down & MU_KEY_SHIFT);
 	}
 
 	if (ctx->focus == muid) {
@@ -635,7 +639,7 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 	}
 }
 
-void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth) {
+void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, int isSelected) {
 	mu_Id muid = mu_get_id(ctx, &unit, sizeof(Unit*));
 
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
@@ -645,15 +649,6 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth) {
 		|| (drag.Type == DRAG_TYPE_CREATE_UNION && drag.CreateUnion.OriginUnit == unit)
 	);
 	int nonSingular = Unit_IsNonSingular(unit);
-	int isSelected = 0;
-	{
-		ITER_UnitRange(selection, it) {
-			if (it == unit) {
-				isSelected = 1;
-				break;
-			}
-		}
-	}
 
 	mu_Rect contentsRect = mu_rect(
 		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
