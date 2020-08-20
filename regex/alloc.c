@@ -63,8 +63,7 @@ Special* Special_init(Special* special) {
 }
 
 Set* Set_init(Set* set) {
-	set->Items[0] = SetItem_init(RE_NEW(SetItem));
-	set->NumItems = 1;
+	set->NumItems = 0;
 	return set;
 }
 

@@ -235,7 +235,7 @@ struct mu_Context {
   int mouse_is_dragging;
   int key_down;
   int key_pressed;
-  char input_text[32];
+  char input_text[1024];
 
   // Ben's custom additions
   float dt;

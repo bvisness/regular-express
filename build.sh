@@ -10,7 +10,7 @@ which wasm-ld-10 && wasmld="wasm-ld-10"
 
 wat2wasm sys.wat
 
-flags="--target=wasm32 -c -O2 -flto -nostdlib -I fakestdlib -Wno-builtin-requires-header -Wno-incompatible-pointer-types-discards-qualifiers -Wno-int-conversion"
+flags="--target=wasm32 -c -O2 -flto -nostdlib -I fakestdlib -Wno-builtin-requires-header"
 
 $clang $flags -o stb_sprintf.o fakestdlib/stb_sprintf.c
 $clang $flags -o stdio.o fakestdlib/stdio.c
@@ -23,6 +23,7 @@ $clang $flags -o pool.o regex/pool.c
 $clang $flags -o regex.o regex/regex.c
 $clang $flags -o tree.o regex/tree.c
 $clang $flags -o textinput.o regex/textinput.c
+$clang $flags -o parser.o regex/parser.c
 
 $wasmld \
 	--no-entry \
@@ -32,6 +33,6 @@ $wasmld \
 	--initial-memory=655360 \
 	--lto-O2 \
 	-o test.wasm \
-	stb_sprintf.o stdio.o stdlib.o string.o test.o microui.o alloc.o pool.o regex.o tree.o textinput.o
+	stb_sprintf.o stdio.o stdlib.o string.o test.o microui.o alloc.o pool.o regex.o tree.o textinput.o parser.o
 
 wasm2wat test.wasm > test.wat

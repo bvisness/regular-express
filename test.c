@@ -7,6 +7,7 @@
 #include "util/util.h"
 
 #include "regex/alloc.h"
+#include "regex/parser.h"
 #include "regex/pool.h"
 #include "regex/regex.h"
 #include "regex/tree.h"
@@ -304,12 +305,34 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 		} else if (ctx->key_pressed & MU_KEY_DELETE) {
 			ctx->key_pressed &= ~MU_KEY_DELETE;
 			result = deleteForwards(ex->TextState);
+		} else if (inputTextLength > 1) {
+			// assume we are pasting and want to parse a regex
+			// TODO: We should probably explicitly detect that we are pasting.
+			Regex* parseResult = parse(ctx->input_text);
+
+			if (parseResult->NumUnionMembers == 1) {
+				// can insert all units inline
+				NoUnionEx* src = parseResult->UnionMembers[0];
+				while (src->NumUnits > 0) {
+					Unit* unit = NoUnionEx_RemoveUnit(src, 0);
+					NoUnionEx_AddUnit(ex, unit, ex->TextState.CursorPosition);
+					ex->TextState.CursorPosition++;
+				}
+			} else {
+				// must create a group
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
+				newUnit->Contents->Group->Regex = parseResult;
+
+				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.CursorPosition);
+			}
 		} else if (inputTextLength > 0) {
 			for (int i = 0; i < inputTextLength; i++) {
 				Unit* newUnit;
 				if (inputTextLength == 1 && ctx->input_text[0] == '[') {
 					newUnit = Unit_init(RE_NEW(Unit));
 					UnitContents_SetType(newUnit->Contents, RE_CONTENTS_SET);
+					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents->Set, sizeof(Set*)));
 				} else {
 					newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[i]);
 				}
@@ -1107,7 +1130,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 }
 
 void drawRailroad_Set(Set* set, Vec2i origin) {
-	mu_Id muid = mu_get_id(ctx, &set, sizeof(Set*));
+	mu_Id muid = mu_get_id_noidstack(ctx, &set, sizeof(Set*));
 
 	// TODO: Selections
 
