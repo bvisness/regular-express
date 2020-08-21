@@ -1,5 +1,5 @@
-#ifndef TEXTSELECTION_H
-#define TEXTSELECTION_H
+#ifndef TEXTINPUT_H
+#define TEXTINPUT_H
 
 typedef struct TextInputState {
     int CursorPosition;
@@ -23,6 +23,12 @@ typedef struct TextEditResult {
     int DeleteMax;
 
     TextInputState ResultState;
+
+    /*
+    Insert data is not included here; it's up to the control to actually
+    perform the insert after calling TextState_InsertString and handling
+    whatever actions it was told to do.
+    */
 } TextEditResult;
 
 TextEditResult TextState_DeleteBackwards(TextInputState state);
