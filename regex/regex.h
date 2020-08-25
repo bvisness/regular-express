@@ -46,7 +46,7 @@ struct Regex {
 };
 
 void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex);
-void Regex_RemoveUnionMember(Regex* regex, int index);
+struct NoUnionEx* Regex_RemoveUnionMember(Regex* regex, int index);
 
 typedef struct NoUnionEx {
     int NumUnits;
@@ -62,8 +62,29 @@ void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index);
 struct Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index);
 void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit);
 
+typedef struct LitChar {
+    union {
+        char C;
+        char _buf[2];
+    };
+} LitChar;
+
+typedef struct UnitContents {
+    int Type;
+
+    struct LitChar LitChar;
+    struct MetaChar* MetaChar;
+    struct Special* Special;
+    struct Set* Set;
+    struct Group* Group;
+
+    Vec2i Size;
+    int WireHeight;
+    mu_Rect LastRect;
+} UnitContents;
+
 typedef struct Unit {
-    struct UnitContents* Contents;
+    struct UnitContents Contents;
 
     int RepeatMin;
     int RepeatMax; // zero means unbounded
@@ -102,20 +123,6 @@ int Unit_IsRepeat(Unit* unit);
 int Unit_ShouldShowLeftHandle(Unit* unit);
 int Unit_ShouldShowRightHandle(Unit* unit);
 
-typedef struct UnitContents {
-    int Type;
-
-    struct LitChar* LitChar;
-    struct MetaChar* MetaChar;
-    struct Special* Special;
-    struct Set* Set;
-    struct Group* Group;
-
-    Vec2i Size;
-    int WireHeight;
-    mu_Rect LastRect;
-} UnitContents;
-
 typedef struct Group {
     struct Regex* Regex;
     // more properties eventually, like names
@@ -137,31 +144,24 @@ typedef struct Set {
 void Set_AddItem(Set* set, struct SetItem* item, int index);
 struct SetItem* Set_RemoveItem(Set* set, int index);
 
+typedef struct SetItemRange {
+    struct LitChar Min;
+    struct LitChar Max;
+} SetItemRange;
+
 typedef struct SetItem {
     int Type;
 
-    struct LitChar* LitChar;
-    struct SetItemRange* Range;
+    struct LitChar LitChar;
+    struct SetItemRange Range;
 
     Vec2i Size;
     mu_Rect LastRect;
 } SetItem;
 
-typedef struct SetItemRange {
-    struct LitChar* Min;
-    struct LitChar* Max;
-} SetItemRange;
-
 typedef struct Special {
     int Type;
 } Special;
-
-typedef struct LitChar {
-    union {
-        char C;
-        char _buf[2];
-    };
-} LitChar;
 
 typedef struct MetaChar {
     char _backslash;

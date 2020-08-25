@@ -34,8 +34,8 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
             Regex* groupRegex = parseRegex(regexStr, i, len);
 
             Unit* newUnit = Unit_init(RE_NEW(Unit));
-            UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
-            newUnit->Contents->Group->Regex = groupRegex;
+            UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
+            newUnit->Contents.Group->Regex = groupRegex;
             NoUnionEx_AddUnit(ex, newUnit, -1);
         } else if (c == '|') {
             // TODO: Maybe this should use a helper method on NoUnionEx
@@ -74,9 +74,9 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
 
 Unit* parseSet(char* regexStr, int* i, int len) {
     Unit* setUnit = Unit_init(RE_NEW(Unit));
-    UnitContents_SetType(setUnit->Contents, RE_CONTENTS_SET);
+    UnitContents_SetType(&setUnit->Contents, RE_CONTENTS_SET);
 
-    Set* set = setUnit->Contents->Set;
+    Set* set = setUnit->Contents.Set;
 
     while (1) {
         char c = regexStr[*i];
@@ -96,18 +96,18 @@ Unit* parseSet(char* regexStr, int* i, int len) {
             // make a range!
             SetItem* item = set->Items[set->NumItems - 1];
             item->Type = RE_SETITEM_RANGE;
-            item->Range->Min->C = item->LitChar->C;
-            item->Range->Max->C = regexStr[*i + 1];
+            item->Range.Min.C = item->LitChar.C;
+            item->Range.Max.C = regexStr[*i + 1];
             (*i)++;
         } else if (c == '\\') {
             (*i)++;
             c = regexStr[*i];
             SetItem* item = SetItem_init(RE_NEW(SetItem));
-            item->LitChar->C = c;
+            item->LitChar.C = c;
             Set_AddItem(set, item, -1);
         } else {
             SetItem* item = SetItem_init(RE_NEW(SetItem));
-            item->LitChar->C = c;
+            item->LitChar.C = c;
             Set_AddItem(set, item, -1);
         }
 

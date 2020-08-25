@@ -85,25 +85,25 @@ void doTree_Unit(mu_Context* ctx, Unit* unit) {
 	mu_push_id(ctx, &unit, sizeof(Unit*));
 
 	if (mu_begin_treenode_ex(ctx, "Unit", MU_OPT_EXPANDED)) {
-		if (mu_button(ctx, RE_CONTENTS_ToString(unit->Contents->Type))) {
+		if (mu_button(ctx, RE_CONTENTS_ToString(unit->Contents.Type))) {
 			mu_open_popup(ctx, "Unit Type");
 		}
 
 		if (mu_begin_popup(ctx, "Unit Type")) {
 			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_LITCHAR))) {
-				UnitContents_SetType(unit->Contents, RE_CONTENTS_LITCHAR);
+				UnitContents_SetType(&unit->Contents, RE_CONTENTS_LITCHAR);
 			}
 			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_METACHAR))) {
-				UnitContents_SetType(unit->Contents, RE_CONTENTS_METACHAR);
+				UnitContents_SetType(&unit->Contents, RE_CONTENTS_METACHAR);
 			}
 			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_SPECIAL))) {
-				UnitContents_SetType(unit->Contents, RE_CONTENTS_SPECIAL);
+				UnitContents_SetType(&unit->Contents, RE_CONTENTS_SPECIAL);
 			}
 			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_SET))) {
-				UnitContents_SetType(unit->Contents, RE_CONTENTS_SET);
+				UnitContents_SetType(&unit->Contents, RE_CONTENTS_SET);
 			}
 			if (mu_button(ctx, RE_CONTENTS_ToString(RE_CONTENTS_GROUP))) {
-				UnitContents_SetType(unit->Contents, RE_CONTENTS_GROUP);
+				UnitContents_SetType(&unit->Contents, RE_CONTENTS_GROUP);
 			}
 
 			// TODO: Initialize other kinds of content types
@@ -135,21 +135,21 @@ void doTree_Unit(mu_Context* ctx, Unit* unit) {
 		mu_layout_row(ctx, 0, NULL, 0);
 
 		// Handle contents
-		switch (unit->Contents->Type) {
+		switch (unit->Contents.Type) {
 			case RE_CONTENTS_LITCHAR: {
-				doTree_LitChar(ctx, unit->Contents->LitChar);
+				doTree_LitChar(ctx, &unit->Contents.LitChar);
 			} break;
 			case RE_CONTENTS_METACHAR: {
-				doTree_MetaChar(ctx, unit->Contents->MetaChar);
+				doTree_MetaChar(ctx, unit->Contents.MetaChar);
 			} break;
 			case RE_CONTENTS_SPECIAL: {
 				mu_label(ctx, "Special guy!!"); // TODO: You know
 			} break;
 			case RE_CONTENTS_SET: {
-				doTree_Set(ctx, unit->Contents->Set);
+				doTree_Set(ctx, unit->Contents.Set);
 			} break;
 			case RE_CONTENTS_GROUP: {
-				doTree_Group(ctx, unit->Contents->Group);
+				doTree_Group(ctx, unit->Contents.Group);
 			} break;
 		}
 
@@ -226,14 +226,14 @@ void doTree_SetItem(mu_Context* ctx, SetItem* item) {
 	}
 
 	switch (item->Type) {
-		case RE_SETITEM_LITCHAR: { doTree_LitChar(ctx, item->LitChar); } break;
+		case RE_SETITEM_LITCHAR: { doTree_LitChar(ctx, &item->LitChar); } break;
 		case RE_SETITEM_RANGE: {
-			SetItemRange* range = item->Range;
+			SetItemRange* range = &item->Range;
 
 			mu_layout_row(ctx, 3, (int[]) { 40, 20, 40 }, 0);
-			mu_textbox(ctx, range->Min->_buf, sizeof(char) * 2);
+			mu_textbox(ctx, range->Min._buf, sizeof(char) * 2);
 			mu_label(ctx, "-");
-			mu_textbox(ctx, range->Max->_buf, sizeof(char) * 2);
+			mu_textbox(ctx, range->Max._buf, sizeof(char) * 2);
 			mu_layout_row(ctx, 0, NULL, 0);
 		} break;
 	}

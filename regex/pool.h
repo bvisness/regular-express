@@ -16,6 +16,9 @@ struct Pool {
     size_t buf_len;
     size_t chunk_size;
 
+    // int capacity; // always POOL_SIZE right now
+    int count;
+
     PoolFreeNode *head;
 };
 

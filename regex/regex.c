@@ -7,13 +7,15 @@ void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
     regex->NumUnionMembers++;
 }
 
-void Regex_RemoveUnionMember(Regex* regex, int index) {
+NoUnionEx* Regex_RemoveUnionMember(Regex* regex, int index) {
+    NoUnionEx* ex = regex->UnionMembers[index];
+
     regex->NumUnionMembers--;
     for (int i = index; i < regex->NumUnionMembers; i++) {
         regex->UnionMembers[i] = regex->UnionMembers[i + 1];
     }
 
-    // TODO: Free the deleted thing??
+    return ex;
 }
 
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
@@ -287,7 +289,7 @@ char* toString_Unit(char* base, Unit* unit) {
         return base;
     }
 
-    base = toString_UnitContents(base, unit->Contents);
+    base = toString_UnitContents(base, &unit->Contents);
 
     if (unit->RepeatMin == 1 && unit->RepeatMax == 1) {
         // do nothing, this is the default
@@ -326,7 +328,7 @@ char* toString_UnitContents(char* base, UnitContents* contents) {
             base = toString_Special(base, contents->Special);
         } break;
         case RE_CONTENTS_LITCHAR: {
-            base = toString_LitChar(base, contents->LitChar);
+            base = toString_LitChar(base, &contents->LitChar);
         } break;
         case RE_CONTENTS_METACHAR: {
             base = toString_MetaChar(base, contents->MetaChar);
@@ -372,10 +374,10 @@ char* toString_SetItem(char* base, SetItem* item) {
 
     switch (item->Type) {
         case RE_SETITEM_LITCHAR: {
-            base = toString_LitChar(base, item->LitChar);
+            base = toString_LitChar(base, &item->LitChar);
         } break;
         case RE_SETITEM_RANGE: {
-            base = toString_SetItemRange(base, item->Range);
+            base = toString_SetItemRange(base, &item->Range);
         } break;
     }
 
@@ -387,9 +389,9 @@ char* toString_SetItemRange(char* base, SetItemRange* range) {
         return base;
     }
 
-    base = toString_LitChar(base, range->Min);
+    base = toString_LitChar(base, &range->Min);
     base = writeLiteral(base, "-");
-    base = toString_LitChar(base, range->Max);
+    base = toString_LitChar(base, &range->Max);
 
     return base;
 }

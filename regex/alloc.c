@@ -15,12 +15,10 @@ RE_DEFINE_POOL(Regex);
 RE_DEFINE_POOL(NoUnionEx);
 RE_DEFINE_POOL(Unit);
 RE_DEFINE_POOL(UnitContents);
-RE_DEFINE_POOL(LitChar);
 RE_DEFINE_POOL(MetaChar);
 RE_DEFINE_POOL(Special);
 RE_DEFINE_POOL(Set);
 RE_DEFINE_POOL(SetItem);
-RE_DEFINE_POOL(SetItemRange);
 RE_DEFINE_POOL(Group);
 
 Regex* Regex_init(Regex* regex) {
@@ -35,7 +33,7 @@ NoUnionEx* NoUnionEx_init(NoUnionEx* ex) {
 }
 
 Unit* Unit_init(Unit* unit) {
-	unit->Contents = UnitContents_init(RE_NEW(UnitContents));
+	UnitContents_init(&unit->Contents);
 	unit->RepeatMin = 1;
 	unit->RepeatMax = 1;
 	unit->_minbuf = 1.0f;
@@ -43,13 +41,12 @@ Unit* Unit_init(Unit* unit) {
 	return unit;
 }
 
-UnitContents* UnitContents_init(UnitContents* contents) {
+void UnitContents_init(UnitContents* contents) {
 	UnitContents_SetType(contents, RE_CONTENTS_LITCHAR);
-	return contents;
 }
 
-LitChar* LitChar_init(LitChar* c) {
-	return c;
+void LitChar_init(LitChar* c) {
+	// nothing for now; maybe give it a default?
 }
 
 MetaChar* MetaChar_init(MetaChar* c) {
@@ -69,15 +66,14 @@ Set* Set_init(Set* set) {
 
 SetItem* SetItem_init(SetItem* item) {
 	item->Type = RE_SETITEM_LITCHAR;
-	item->LitChar = LitChar_init(RE_NEW(LitChar));
-	item->Range = SetItemRange_init(RE_NEW(SetItemRange));
+	LitChar_init(&item->LitChar);
+	SetItemRange_init(&item->Range);
 	return item;
 }
 
-SetItemRange* SetItemRange_init(SetItemRange* range) {
-	range->Min = LitChar_init(RE_NEW(LitChar));
-	range->Max = LitChar_init(RE_NEW(LitChar));
-	return range;
+void SetItemRange_init(SetItemRange* range) {
+	LitChar_init(&range->Min);
+	LitChar_init(&range->Max);
 }
 
 Group* Group_init(Group* group) {
@@ -89,7 +85,7 @@ Group* Group_init(Group* group) {
 
 Unit* Unit_initWithLiteralChar(Unit* unit, char c) {
 	Unit_init(unit);
-	unit->Contents->LitChar->C = c;
+	unit->Contents.LitChar.C = c;
 
 	return unit;
 }
@@ -98,9 +94,7 @@ void UnitContents_SetType(UnitContents* contents, int type) {
 	contents->Type = type;
 	switch (type) {
 		case RE_CONTENTS_LITCHAR: {
-			if (!contents->LitChar) {
-				contents->LitChar = LitChar_init(RE_NEW(LitChar));
-			}
+			LitChar_init(&contents->LitChar);
 		} break;
 		case RE_CONTENTS_METACHAR: {
 			if (!contents->MetaChar) {
@@ -124,3 +118,65 @@ void UnitContents_SetType(UnitContents* contents, int type) {
 		} break;
 	}
 }
+
+void Regex_delete(Regex* regex) {
+	for (int i = 0; i < regex->NumUnionMembers; i++) {
+		printf("Deleting a union member");
+		NoUnionEx_delete(regex->UnionMembers[i]);
+	}
+
+	RE_FREE(Regex, regex);
+}
+
+void NoUnionEx_delete(NoUnionEx* ex) {
+	for (int i = 0; i < ex->NumUnits; i++) {
+		Unit_delete(ex->Units[i]);
+	}
+
+	RE_FREE(NoUnionEx, ex);
+}
+
+void Unit_delete(Unit* unit) {
+	UnitContents* contents = &unit->Contents;
+	if (contents->MetaChar) {
+		MetaChar_delete(contents->MetaChar);
+	}
+	if (contents->Special) {
+		Special_delete(contents->Special);
+	}
+	if (contents->Set) {
+		Set_delete(contents->Set);
+	}
+	if (contents->Group) {
+		Group_delete(contents->Group);
+	}
+
+	RE_FREE(Unit, unit);
+}
+
+void MetaChar_delete(MetaChar* c) {
+	RE_FREE(MetaChar, c);
+}
+
+void Special_delete(Special* special) {
+	RE_FREE(Special, special);
+}
+
+void Set_delete(Set* set) {
+	for (int i = 0; i < set->NumItems; i++) {
+		SetItem_delete(set->Items[i]);
+	}
+
+	RE_FREE(Set, set);
+}
+
+void SetItem_delete(SetItem* item) {
+	RE_FREE(SetItem, item);
+}
+
+void Group_delete(Group* group) {
+	Regex_delete(group->Regex);
+
+	RE_FREE(Group, group);
+}
+

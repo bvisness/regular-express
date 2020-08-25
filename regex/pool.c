@@ -51,6 +51,8 @@ void *pool_alloc(Pool *p) {
     // Pop free node
     p->head = p->head->next;
 
+    p->count++;
+
     // Zero memory by default
     return memset(node, 0, p->chunk_size);
 }
@@ -71,6 +73,8 @@ void pool_free(Pool *p, void *ptr) {
         return;
     }
 
+    p->count--;
+
     // Push free node
     node = (PoolFreeNode *)ptr;
     node->next = p->head;
@@ -80,6 +84,8 @@ void pool_free(Pool *p, void *ptr) {
 void pool_free_all(Pool *p) {
     size_t chunk_count = p->buf_len / p->chunk_size;
     size_t i;
+
+    p->count = 0;
 
     // Set all chunks to be free
     for (i = 0; i < chunk_count; i++) {

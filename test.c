@@ -167,9 +167,9 @@ void MoveUnitsTo(UnitRange range, NoUnionEx* ex, int startIndex) {
 // TODO: Please move this somewhere else. This is all way too big.
 Unit* ConvertRangeToGroup(UnitRange range) {
 	Unit* newUnit = Unit_init(RE_NEW(Unit));
-	UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
+	UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
 
-	NoUnionEx* ex = newUnit->Contents->Group->Regex->UnionMembers[0];
+	NoUnionEx* ex = newUnit->Contents.Group->Regex->UnionMembers[0];
 	MoveUnitsTo(range, ex, 0);
 
 	NoUnionEx_AddUnit(range.Ex, newUnit, range.Start);
@@ -239,8 +239,8 @@ void prepass_Regex(Regex* regex) {
 	for (int i = regex->NumUnionMembers-1; i >= 0; i--) {
 		NoUnionEx* member = regex->UnionMembers[i];
 		if (member->NumUnits == 0 && regex->NumUnionMembers > 1) {
-			Regex_RemoveUnionMember(regex, i);
-			// TODO: Free the deleted expression?
+			NoUnionEx* deleted = Regex_RemoveUnionMember(regex, i);
+			NoUnionEx_delete(deleted);
 		}
 	}
 
@@ -297,6 +297,10 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 			ctx->key_pressed &= ~MU_KEY_DELETE;
 			result = TextState_DeleteForwards(ex->TextState);
 		} else if (inputTextLength > 1) {
+			printf("POOLS BEFORE PARSE");
+			RE_PRINT_POOL(Regex);
+			RE_PRINT_POOL(NoUnionEx);
+
 			// assume we are pasting and want to parse a regex
 			// TODO: We should probably explicitly detect that we are pasting.
 			Regex* parseResult = parse(ctx->input_text);
@@ -312,18 +316,24 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 			} else {
 				// must create a group
 				Unit* newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(newUnit->Contents, RE_CONTENTS_GROUP);
-				newUnit->Contents->Group->Regex = parseResult;
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
+				newUnit->Contents.Group->Regex = parseResult;
 
 				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.CursorPosition);
 			}
+
+			printf("POOLS BEFORE DELETE");
+			RE_PRINT_POOL(Regex);
+			RE_PRINT_POOL(NoUnionEx);
+			printf("Deleting the regex");
+			Regex_delete(parseResult);
 		} else if (inputTextLength > 0) {
 			for (int i = 0; i < inputTextLength; i++) {
 				Unit* newUnit;
 				if (inputTextLength == 1 && ctx->input_text[0] == '[') {
 					newUnit = Unit_init(RE_NEW(Unit));
-					UnitContents_SetType(newUnit->Contents, RE_CONTENTS_SET);
-					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents->Set, sizeof(Set*)));
+					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
+					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
 				} else {
 					newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[i]);
 				}
@@ -340,7 +350,8 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 			result.DeleteMax = iclamp(result.DeleteMax, 0, ex->NumUnits);
 
 			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
-				NoUnionEx_RemoveUnit(ex, result.DeleteMin);
+				Unit* deleted = NoUnionEx_RemoveUnit(ex, result.DeleteMin);
+				Unit_delete(deleted);
 			}
 
 			ex->TextState = result.ResultState;
@@ -376,7 +387,7 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 }
 
 void prepass_Unit(Unit* unit) {
-	UnitContents* contents = unit->Contents;
+	UnitContents* contents = &unit->Contents;
 	prepass_UnitContents(contents);
 
 	int attachmentWidth = Unit_IsNonSingular(unit) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0;
@@ -619,7 +630,7 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 			cursorUnit = ex->Units[ex->TextState.CursorPosition];
 		}
 
-		mu_Rect contentsRect = cursorUnit->Contents->LastRect;
+		mu_Rect contentsRect = cursorUnit->Contents.LastRect;
 
 		if (cursorRight) {
 			mu_draw_rect(
@@ -649,7 +660,10 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 		if (selection.Ex) {
 			// selection bounding box
 			// TODO: UnitRange Helper
-			mu_Rect sbb = selection.Ex->Units[selection.Start]->LastRect; // TODO: Actually get the bounding box of the whole selection
+			mu_Rect sbb = selection.Ex->Units[selection.Start]->LastRect;
+			for (int i = selection.Start + 1; i <= selection.End; i++) {
+				sbb = rect_union(sbb, selection.Ex->Units[i]->LastRect);
+			}
 
 			const int BUTTON_WIDTH = 100;
 
@@ -676,8 +690,8 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	mu_Rect contentsRect = mu_rect(
 		origin.x + unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
 		origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT,
-		unit->Contents->Size.w,
-		unit->Contents->Size.h
+		unit->Contents.Size.w,
+		unit->Contents.Size.h
 	);
 	int isContentHover = isHover && mu_mouse_over(ctx, contentsRect);
 
@@ -688,7 +702,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	unit->IsWireDragOrigin = isWireDragOrigin;
 	unit->IsSelected = isSelected;
 
-	int middleY = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT + unit->Contents->WireHeight;
+	int middleY = origin.y + UNIT_REPEAT_WIRE_ZONE_HEIGHT + unit->Contents.WireHeight;
 
 	// thru-wires
 	mu_draw_rect(
@@ -707,7 +721,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 			origin.x
 				+ unit->LeftHandleZoneWidth
 				+ (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
-				+ unit->Contents->Size.x,
+				+ unit->Contents.Size.x,
 			middleY - WIRE_THICKNESS/2,
 			(nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0) + unit->RightHandleZoneWidth,
 			WIRE_THICKNESS
@@ -741,7 +755,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 		int handleX = origin.x
 			+ unit->LeftHandleZoneWidth
 			+ (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
-			+ unit->Contents->Size.x
+			+ unit->Contents.Size.x
 			+ (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
 			+ unit->RightHandleZoneWidth/2
 			- HANDLE_SIZE/2;
@@ -755,7 +769,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 		origin.x,
 		contentsRect.y,
 		unit->LeftHandleZoneWidth + (nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
-		unit->Contents->Size.y
+		unit->Contents.Size.y
 	));
 	unit->IsRightWireHover = mu_mouse_over(ctx, mu_rect(
 		contentsRect.x + contentsRect.w,
@@ -763,7 +777,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 		(nonSingular ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0)
 			+ unit->RightHandleZoneWidth
 			+ (Unit_Next(unit) && Unit_IsNonSingular(Unit_Next(unit)) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0),
-		unit->Contents->Size.y
+		unit->Contents.Size.y
 	));
 
 	int leftWireX = origin.x
@@ -773,7 +787,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	int rightWireX = origin.x
 		+ unit->LeftHandleZoneWidth
 		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH
-		+ unit->Contents->Size.x
+		+ unit->Contents.Size.x
 		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2
 		- WIRE_THICKNESS/2;
 
@@ -782,7 +796,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	if (unit->RepeatMin < 1) {
 		// draw the skip wire
 		int skipWireY = middleY
-			- unit->Contents->WireHeight
+			- unit->Contents.WireHeight
 			- UNIT_REPEAT_WIRE_MARGIN
 			- scoot
 			- WIRE_THICKNESS;
@@ -807,8 +821,8 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	if (unit->RepeatMax != 1) {
 		// draw the repeat wire
 		int repeatWireY = middleY
-			- unit->Contents->WireHeight
-			+ unit->Contents->Size.y
+			- unit->Contents.WireHeight
+			+ unit->Contents.Size.y
 			+ UNIT_REPEAT_WIRE_MARGIN
 			- scoot;
 
@@ -830,7 +844,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	}
 
 	drawRailroad_UnitContents(
-		unit->Contents,
+		&unit->Contents,
 		(Vec2i) {
 			.x = contentsRect.x,
 			.y = contentsRect.y,
@@ -862,7 +876,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	);
 
 	if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, contentsRect)) {
-		if (unit->Contents->Type == RE_CONTENTS_SET) {
+		if (unit->Contents.Type == RE_CONTENTS_SET) {
 			// do nothing, let the set handle the click
 		} else {
 			ctx->mouse_released &= ~MU_MOUSE_LEFT;
@@ -1124,7 +1138,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 		case RE_CONTENTS_LITCHAR: {
 			mu_draw_rect(ctx, r, backgroundColor);
 
-			char* str = contents->LitChar->_buf;
+			char* str = contents->LitChar._buf;
 			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
@@ -1168,14 +1182,14 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 
 		if (item->Type == RE_SETITEM_LITCHAR) {
 			mu_layout_set_next(ctx, itemRect, 0);
-			char* str = item->LitChar->_buf;
+			char* str = item->LitChar._buf;
 			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} else if (item->Type == RE_SETITEM_RANGE) {
 			{
 				mu_Rect r = mu_rect(itemX, itemY, UNIT_CONTENTS_LITCHAR_WIDTH, itemRect.h);
 				mu_layout_set_next(ctx, r, 0);
-				char* str = item->Range->Min->_buf;
+				char* str = item->Range.Min._buf;
 				mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
 				draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 			}
@@ -1190,7 +1204,7 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 			{
 				mu_Rect r = mu_rect(itemX + UNIT_CONTENTS_LITCHAR_WIDTH + SET_DASH_WIDTH, itemY, UNIT_CONTENTS_LITCHAR_WIDTH, itemRect.h);
 				mu_layout_set_next(ctx, r, 0);
-				char* str = item->Range->Max->_buf;
+				char* str = item->Range.Max._buf;
 				mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
 				draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 			}
@@ -1269,16 +1283,16 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 			if (
 				itemBeforeCursor
 				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
-				&& itemBeforeCursor->Range->Max->C != 0
+				&& itemBeforeCursor->Range.Max.C != 0
 			) {
-				itemBeforeCursor->Range->Max->C = 0;
+				itemBeforeCursor->Range.Max.C = 0;
 			} else if (
 				itemBeforeCursor
 				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
-				&& itemBeforeCursor->Range->Max->C == 0
+				&& itemBeforeCursor->Range.Max.C == 0
 			) {
 				itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
-				itemBeforeCursor->LitChar->C = itemBeforeCursor->Range->Min->C;
+				itemBeforeCursor->LitChar.C = itemBeforeCursor->Range.Min.C;
 			} else {
 				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 				result = TextState_DeleteBackwards(set->TextState);
@@ -1296,22 +1310,22 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 							&& itemBeforeCursor->Type != RE_SETITEM_RANGE
 						) {
 							itemBeforeCursor->Type = RE_SETITEM_RANGE;
-							itemBeforeCursor->Range->Min->C = itemBeforeCursor->LitChar->C;
+							itemBeforeCursor->Range.Min.C = itemBeforeCursor->LitChar.C;
 							break;
 						}
 
 						if (
 							itemBeforeCursor
 							&& itemBeforeCursor->Type == RE_SETITEM_RANGE
-							&& itemBeforeCursor->Range->Max->C == 0
+							&& itemBeforeCursor->Range.Max.C == 0
 						) {
-							itemBeforeCursor->Range->Max->C = ctx->input_text[i];
+							itemBeforeCursor->Range.Max.C = ctx->input_text[i];
 							break;
 						}
 					}
 
 					SetItem* newItem = SetItem_init(RE_NEW(SetItem));
-					newItem->LitChar->C = ctx->input_text[i];
+					newItem->LitChar.C = ctx->input_text[i];
 					Set_AddItem(set, newItem, set->TextState.CursorPosition);
 					set->TextState.CursorPosition++;
 				} while (0);
@@ -1357,6 +1371,15 @@ int frame(float dt) {
 	const int PAGE_WIDTH = 800;
 	const int WINDOW_PADDING = 10;
 	const int GUI_HEIGHT = 300;
+
+	RE_PRINT_POOL(Regex);
+	RE_PRINT_POOL(NoUnionEx);
+	RE_PRINT_POOL(Unit);
+	RE_PRINT_POOL(MetaChar);
+	RE_PRINT_POOL(Special);
+	RE_PRINT_POOL(Set);
+	RE_PRINT_POOL(SetItem);
+	RE_PRINT_POOL(Group);
 
 	prepass_Regex(regex);
 	prepass_NoUnionEx(&moveUnitsEx);
@@ -1505,7 +1528,7 @@ int frame(float dt) {
 			NoUnionEx* newUnionMember = NoUnionEx_init(RE_NEW(NoUnionEx));
 			Unit* initialUnit = Unit_init(RE_NEW(Unit));
 			NoUnionEx_AddUnit(newUnionMember, initialUnit, -1);
-			Regex_AddUnionMember(newUnit->Contents->Group->Regex, newUnionMember);
+			Regex_AddUnionMember(newUnit->Contents.Group->Regex, newUnionMember);
 		}
 
 		drag = (DragContext) {0};
