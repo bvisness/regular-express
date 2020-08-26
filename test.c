@@ -297,10 +297,6 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 			ctx->key_pressed &= ~MU_KEY_DELETE;
 			result = TextState_DeleteForwards(ex->TextState);
 		} else if (inputTextLength > 1) {
-			printf("POOLS BEFORE PARSE");
-			RE_PRINT_POOL(Regex);
-			RE_PRINT_POOL(NoUnionEx);
-
 			// assume we are pasting and want to parse a regex
 			// TODO: We should probably explicitly detect that we are pasting.
 			Regex* parseResult = parse(ctx->input_text);
@@ -322,10 +318,6 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.CursorPosition);
 			}
 
-			printf("POOLS BEFORE DELETE");
-			RE_PRINT_POOL(Regex);
-			RE_PRINT_POOL(NoUnionEx);
-			printf("Deleting the regex");
 			Regex_delete(parseResult);
 		} else if (inputTextLength > 0) {
 			for (int i = 0; i < inputTextLength; i++) {
@@ -1365,13 +1357,7 @@ void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected)
 	);
 }
 
-int frame(float dt) {
-	mu_begin(ctx, dt);
-
-	const int PAGE_WIDTH = 800;
-	const int WINDOW_PADDING = 10;
-	const int GUI_HEIGHT = 300;
-
+void printPools() {
 	RE_PRINT_POOL(Regex);
 	RE_PRINT_POOL(NoUnionEx);
 	RE_PRINT_POOL(Unit);
@@ -1380,6 +1366,14 @@ int frame(float dt) {
 	RE_PRINT_POOL(Set);
 	RE_PRINT_POOL(SetItem);
 	RE_PRINT_POOL(Group);
+}
+
+int frame(float dt) {
+	mu_begin(ctx, dt);
+
+	const int PAGE_WIDTH = 800;
+	const int WINDOW_PADDING = 10;
+	const int GUI_HEIGHT = 300;
 
 	prepass_Regex(regex);
 	prepass_NoUnionEx(&moveUnitsEx);

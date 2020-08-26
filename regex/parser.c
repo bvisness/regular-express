@@ -35,6 +35,11 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
 
             Unit* newUnit = Unit_init(RE_NEW(Unit));
             UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
+
+            // we don't need the regex that was automatically created by
+            // switching to type group.
+            Regex_delete(newUnit->Contents.Group->Regex);
+
             newUnit->Contents.Group->Regex = groupRegex;
             NoUnionEx_AddUnit(ex, newUnit, -1);
         } else if (c == '|') {

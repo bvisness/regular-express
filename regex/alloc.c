@@ -121,7 +121,6 @@ void UnitContents_SetType(UnitContents* contents, int type) {
 
 void Regex_delete(Regex* regex) {
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
-		printf("Deleting a union member");
 		NoUnionEx_delete(regex->UnionMembers[i]);
 	}
 

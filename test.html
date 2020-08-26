@@ -171,6 +171,7 @@
 			);
 
 			console.log(test.exports);
+			window.regex = test.exports;
 
 			canvas.addEventListener('mousemove', e => {
 				test.exports.mouseMove(e.clientX, e.clientY);
