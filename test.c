@@ -668,8 +668,6 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 }
 
 void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, UnitRange* selection) {
-	mu_Id muid = mu_get_id(ctx, &unit, sizeof(Unit*));
-
 	mu_Rect rect = mu_rect(origin.x, origin.y, unit->Size.w, unit->Size.h);
 	int isHover = !(drag.Type == DRAG_TYPE_BOX_SELECT) && mu_mouse_over(ctx, rect);
 	int isWireDragOrigin = (
@@ -1118,8 +1116,6 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 }
 
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected) {
-	mu_Id muid = mu_get_id(ctx, &contents, sizeof(UnitContents*));
-
 	mu_Rect r = mu_rect(origin.x, origin.y, contents->Size.w, contents->Size.h);
 	contents->LastRect = r;
 

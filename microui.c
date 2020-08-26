@@ -47,7 +47,7 @@
   } while (0)
 
 
-static mu_Rect unclipped_rect = { 0, 0, 0x1000000, 0x1000000 };
+static mu_Rect unclipped_rect = { .x = 0, .y = 0, .w = 0x1000000, .h = 0x1000000 };
 
 static mu_Style default_style = {
   /* font | size | padding | spacing | indent */
@@ -721,7 +721,7 @@ void mu_draw_control_text(mu_Context *ctx, const char *str, mu_Rect rect,
   int colorid, int opt)
 {
   mu_Font font = ctx->style->font;
-  int tw = ctx->text_width(font, str, -1);
+  // int tw = ctx->text_width(font, str, -1); // TODO: unused??
   mu_push_clip_rect(ctx, rect);
   mu_Vec2 pos = mu_position_text(ctx, str, rect, font, opt);
   mu_draw_text(ctx, font, str, -1, pos, ctx->style->colors[colorid]);
