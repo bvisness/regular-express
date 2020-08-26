@@ -61,6 +61,7 @@ Special* Special_init(Special* special) {
 
 Set* Set_init(Set* set) {
 	set->NumItems = 0;
+	set->TextState = DEFAULT_TEXT_INPUT_STATE;
 	return set;
 }
 

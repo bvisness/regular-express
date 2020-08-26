@@ -224,13 +224,14 @@ const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
 const mu_Color COLOR_CURSOR = (mu_Color) { 45, 83, 252, 255 };
 const mu_Color COLOR_SELECTED_BACKGROUND = (mu_Color) { 122, 130, 255, 255 };
 
-void prepass_Regex(Regex* regex);
-void prepass_NoUnionEx(NoUnionEx* ex);
-void prepass_Unit(Unit* unit);
-void prepass_UnitContents(UnitContents* contents);
-void prepass_Group(Group* group);
+void prepass_Regex(Regex* regex, NoUnionEx* parentEx);
+void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx);
+void prepass_Unit(Unit* unit, NoUnionEx* ex);
+void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex);
+void prepass_Set(Set* set, NoUnionEx* ex);
+void prepass_Group(Group* group, NoUnionEx* ex);
 
-void prepass_Regex(Regex* regex) {
+void prepass_Regex(Regex* regex, NoUnionEx* parentEx) {
 	int w = 0;
 	int h = 0;
 	int wireHeight = 0;
@@ -246,7 +247,7 @@ void prepass_Regex(Regex* regex) {
 
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
-		prepass_NoUnionEx(member);
+		prepass_NoUnionEx(member, parentEx);
 
 		w = imax(w, member->Size.w);
 		h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + member->Size.h;
@@ -267,7 +268,7 @@ void prepass_Regex(Regex* regex) {
 	regex->WireHeight = wireHeight;
 }
 
-void prepass_NoUnionEx(NoUnionEx* ex) {
+void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
 	mu_Id muid = mu_get_id_noidstack(ctx, &ex, sizeof(NoUnionEx*));
 
 	if (ctx->focus == muid) {
@@ -319,22 +320,30 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 			}
 
 			Regex_delete(parseResult);
-		} else if (inputTextLength > 0) {
-			for (int i = 0; i < inputTextLength; i++) {
-				Unit* newUnit;
-				if (inputTextLength == 1 && ctx->input_text[0] == '[') {
-					newUnit = Unit_init(RE_NEW(Unit));
-					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
-					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
-				} else {
-					newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[i]);
+		} else if (inputTextLength == 1) {
+			Unit* newUnit = NULL;
+			if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == '[') {
+				newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
+				mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
+			} else if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == '9') {
+				newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
+				mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
+			} else if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == '0') {
+				if (parentEx) {
+					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
 				}
+			} else {
+				newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[0]);
+			}
 
+			if (newUnit) {
 				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.CursorPosition);
 				ex->TextState.CursorPosition++;
-
-				ctx->input_text[0] = 0;
 			}
+
+			ctx->input_text[0] = 0;
 		}
 
 		if (result.DoDelete) {
@@ -360,7 +369,7 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 
 	for (int i = 0; i < ex->NumUnits; i++) {
 		Unit* unit = ex->Units[i];
-		prepass_Unit(unit);
+		prepass_Unit(unit, ex);
 
 		w += unit->Size.w;
 		h = imax(h, unit->Size.h);
@@ -378,9 +387,9 @@ void prepass_NoUnionEx(NoUnionEx* ex) {
 	ex->WireHeight = wireHeight;
 }
 
-void prepass_Unit(Unit* unit) {
+void prepass_Unit(Unit* unit, NoUnionEx* ex) {
 	UnitContents* contents = &unit->Contents;
-	prepass_UnitContents(contents);
+	prepass_UnitContents(contents, ex);
 
 	int attachmentWidth = Unit_IsNonSingular(unit) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0;
 
@@ -395,7 +404,7 @@ void prepass_Unit(Unit* unit) {
 	unit->WireHeight = UNIT_REPEAT_WIRE_ZONE_HEIGHT + contents->WireHeight;
 }
 
-void prepass_UnitContents(UnitContents* contents) {
+void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex) {
 	switch (contents->Type) {
 		case RE_CONTENTS_LITCHAR: {
 			contents->Size = (Vec2i) { .w = UNIT_CONTENTS_LITCHAR_WIDTH, .h = UNIT_CONTENTS_MIN_HEIGHT };
@@ -412,6 +421,9 @@ void prepass_UnitContents(UnitContents* contents) {
 		case RE_CONTENTS_SET: {
 			Set* set = contents->Set;
 
+			prepass_Set(set, ex);
+
+			// calculate sizes
 			Vec2i contentsSize = {0};
 
 			for (int i = 0; i < set->NumItems; i++) {
@@ -438,16 +450,113 @@ void prepass_UnitContents(UnitContents* contents) {
 		} break;
 		case RE_CONTENTS_GROUP: {
 			Group* group = contents->Group;
-			prepass_Group(group);
+			prepass_Group(group, ex);
 			contents->Size = group->Size;
 			contents->WireHeight = group->WireHeight;
 		}
 	}
 }
 
-void prepass_Group(Group* group) {
+void prepass_Set(Set* set, NoUnionEx* ex) {
+	mu_Id muid = mu_get_id_noidstack(ctx, &set, sizeof(Set*));
+
+	if (ctx->focus == muid) {
+		// Handle keyboard input to set up for next frame
+		TextEditResult result = {0};
+		int inputTextLength = strlen(ctx->input_text);
+		SetItem* itemBeforeCursor = (set->TextState.CursorPosition > 0
+			? set->Items[set->TextState.CursorPosition - 1]
+			: NULL
+		);
+		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+			set->TextState = TextState_BumpCursor(set->TextState, -1, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
+			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+			set->TextState = TextState_BumpCursor(set->TextState, 1, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_HOME) {
+			ctx->key_pressed &= ~MU_KEY_HOME;
+			set->TextState = TextState_SetCursorPosition(set->TextState, 0, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_END) {
+			ctx->key_pressed &= ~MU_KEY_END;
+			set->TextState = TextState_SetCursorPosition(set->TextState, set->NumItems, 0); // TODO: Selection
+		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
+			if (
+				itemBeforeCursor
+				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
+				&& itemBeforeCursor->Range.Max.C != 0
+			) {
+				itemBeforeCursor->Range.Max.C = 0;
+			} else if (
+				itemBeforeCursor
+				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
+				&& itemBeforeCursor->Range.Max.C == 0
+			) {
+				itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
+				itemBeforeCursor->LitChar.C = itemBeforeCursor->Range.Min.C;
+			} else {
+				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+				result = TextState_DeleteBackwards(set->TextState);
+			}
+		} else if (ctx->key_pressed & MU_KEY_DELETE) {
+			ctx->key_pressed &= ~MU_KEY_DELETE;
+			result = TextState_DeleteForwards(set->TextState);
+		} else if (inputTextLength > 0) {
+			for (int i = 0; i < inputTextLength; i++) {
+				do {
+					if (inputTextLength == 1) {
+						if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[i] == ']') {
+							mu_set_focus(ctx, mu_get_id_noidstack(ctx, &ex, sizeof(NoUnionEx*)));
+							break;
+						}
+
+						if (
+							ctx->input_text[i] == '-'
+							&& itemBeforeCursor
+							&& itemBeforeCursor->Type != RE_SETITEM_RANGE
+						) {
+							itemBeforeCursor->Type = RE_SETITEM_RANGE;
+							itemBeforeCursor->Range.Min.C = itemBeforeCursor->LitChar.C;
+							break;
+						}
+
+						if (
+							itemBeforeCursor
+							&& itemBeforeCursor->Type == RE_SETITEM_RANGE
+							&& itemBeforeCursor->Range.Max.C == 0
+						) {
+							itemBeforeCursor->Range.Max.C = ctx->input_text[i];
+							break;
+						}
+					}
+
+					SetItem* newItem = SetItem_init(RE_NEW(SetItem));
+					newItem->LitChar.C = ctx->input_text[i];
+					Set_AddItem(set, newItem, set->TextState.CursorPosition);
+					set->TextState.CursorPosition++;
+				} while (0);
+			}
+		}
+
+		if (result.DoDelete) {
+			result.DeleteMin = iclamp(result.DeleteMin, 0, set->NumItems);
+			result.DeleteMax = iclamp(result.DeleteMax, 0, set->NumItems);
+
+			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
+				Set_RemoveItem(set, result.DeleteMin);
+			}
+
+			set->TextState = result.ResultState;
+		}
+
+		// fix up cursor position
+		set->TextState.CursorPosition = iclamp(set->TextState.CursorPosition, 0, set->NumItems);
+	}
+}
+
+void prepass_Group(Group* group, NoUnionEx* ex) {
 	Regex* regex = group->Regex;
-	prepass_Regex(regex);
+	prepass_Regex(regex, ex);
 
 	group->Size = (Vec2i) {
 		.w = regex->Size.w,
@@ -1247,92 +1356,6 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 				COLOR_CURSOR
 			);
 		}
-
-		// Handle keyboard input to set up for next frame
-		TextEditResult result = {0};
-		int inputTextLength = strlen(ctx->input_text);
-		SetItem* itemBeforeCursor = (set->TextState.CursorPosition > 0
-			? set->Items[set->TextState.CursorPosition - 1]
-			: NULL
-		);
-		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-			set->TextState = TextState_BumpCursor(set->TextState, -1, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-			set->TextState = TextState_BumpCursor(set->TextState, 1, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_HOME) {
-			ctx->key_pressed &= ~MU_KEY_HOME;
-			set->TextState = TextState_SetCursorPosition(set->TextState, 0, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_END) {
-			ctx->key_pressed &= ~MU_KEY_END;
-			set->TextState = TextState_SetCursorPosition(set->TextState, set->NumItems, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
-			if (
-				itemBeforeCursor
-				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
-				&& itemBeforeCursor->Range.Max.C != 0
-			) {
-				itemBeforeCursor->Range.Max.C = 0;
-			} else if (
-				itemBeforeCursor
-				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
-				&& itemBeforeCursor->Range.Max.C == 0
-			) {
-				itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
-				itemBeforeCursor->LitChar.C = itemBeforeCursor->Range.Min.C;
-			} else {
-				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-				result = TextState_DeleteBackwards(set->TextState);
-			}
-		} else if (ctx->key_pressed & MU_KEY_DELETE) {
-			ctx->key_pressed &= ~MU_KEY_DELETE;
-			result = TextState_DeleteForwards(set->TextState);
-		} else if (inputTextLength > 0) {
-			for (int i = 0; i < inputTextLength; i++) {
-				do {
-					if (inputTextLength == 1) {
-						if (
-							ctx->input_text[i] == '-'
-							&& itemBeforeCursor
-							&& itemBeforeCursor->Type != RE_SETITEM_RANGE
-						) {
-							itemBeforeCursor->Type = RE_SETITEM_RANGE;
-							itemBeforeCursor->Range.Min.C = itemBeforeCursor->LitChar.C;
-							break;
-						}
-
-						if (
-							itemBeforeCursor
-							&& itemBeforeCursor->Type == RE_SETITEM_RANGE
-							&& itemBeforeCursor->Range.Max.C == 0
-						) {
-							itemBeforeCursor->Range.Max.C = ctx->input_text[i];
-							break;
-						}
-					}
-
-					SetItem* newItem = SetItem_init(RE_NEW(SetItem));
-					newItem->LitChar.C = ctx->input_text[i];
-					Set_AddItem(set, newItem, set->TextState.CursorPosition);
-					set->TextState.CursorPosition++;
-				} while (0);
-			}
-		}
-
-		if (result.DoDelete) {
-			result.DeleteMin = iclamp(result.DeleteMin, 0, set->NumItems);
-			result.DeleteMax = iclamp(result.DeleteMax, 0, set->NumItems);
-
-			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
-				Set_RemoveItem(set, result.DeleteMin);
-			}
-
-			set->TextState = result.ResultState;
-		}
-
-		// fix up cursor position
-		set->TextState.CursorPosition = iclamp(set->TextState.CursorPosition, 0, set->NumItems);
 	}
 }
 
@@ -1371,8 +1394,8 @@ int frame(float dt) {
 	const int WINDOW_PADDING = 10;
 	const int GUI_HEIGHT = 300;
 
-	prepass_Regex(regex);
-	prepass_NoUnionEx(&moveUnitsEx);
+	prepass_Regex(regex, NULL);
+	prepass_NoUnionEx(&moveUnitsEx, NULL);
 
 	if (mu_begin_window_ex(ctx, "Test", mu_rect(WINDOW_PADDING, WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, GUI_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(

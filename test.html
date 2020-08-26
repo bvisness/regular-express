@@ -235,7 +235,10 @@
 			window.addEventListener('keydown', e => {
 				if (e.key.length > 1) {
 					specialKeyEvent('down', e);
-				} else if (!e.ctrlKey) {
+				} else if (
+					!e.ctrlKey
+					|| '[]90'.indexOf(e.key) > -1
+				) {
 					putString(test.exports.textInputBuf, e.key);
 					test.exports.textInput();
 					e.preventDefault();

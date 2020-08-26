@@ -1,6 +1,6 @@
 #include "regex.h"
 
-const char* SPECIAL_CHARACTERS = "()[]{}*+?.\\|";
+const char* SPECIAL_CHARACTERS = "()[]{}*+?.\\|^$";
 
 void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
     regex->UnionMembers[regex->NumUnionMembers] = ex;
