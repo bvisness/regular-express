@@ -157,6 +157,10 @@ typedef struct DragContext {
 DragContext drag;
 
 void MoveUnitsTo(UnitRange range, NoUnionEx* ex, int startIndex) {
+	if (startIndex < 0) {
+		startIndex = ex->NumUnits;
+	}
+
 	for (int i = 0; i <= range.End - range.Start; i++) {
 		Unit* unit = range.Ex->Units[range.Start]; // grab head of range
 		NoUnionEx_RemoveUnit(range.Ex, range.Start);
@@ -227,7 +231,7 @@ const mu_Color COLOR_SPECIAL_BACKGROUND = (mu_Color) { 170, 225, 170, 255 };
 const mu_Color COLOR_SELECTED_BACKGROUND = (mu_Color) { 122, 130, 255, 255 };
 
 void prepass_Regex(Regex* regex, NoUnionEx* parentEx);
-void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx);
+void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx);
 void prepass_Unit(Unit* unit, NoUnionEx* ex);
 void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex);
 void prepass_Set(Set* set, NoUnionEx* ex);
@@ -238,18 +242,27 @@ void prepass_Regex(Regex* regex, NoUnionEx* parentEx) {
 	int h = 0;
 	int wireHeight = 0;
 
-	// delete any empty expressions (after the first one)
+	// delete any empty expressions (after the first one) (that are not focused)
 	for (int i = regex->NumUnionMembers-1; i >= 0; i--) {
 		NoUnionEx* member = regex->UnionMembers[i];
-		if (member->NumUnits == 0 && regex->NumUnionMembers > 1) {
+		if (
+			member->NumUnits == 0
+			&& regex->NumUnionMembers > 1
+			&& ctx->focus != mu_get_id_noidstack(ctx, &member, sizeof(NoUnionEx*))
+		) {
 			NoUnionEx* deleted = Regex_RemoveUnionMember(regex, i);
 			NoUnionEx_delete(deleted);
 		}
 	}
 
+	// set indexes on all the expressions
+	for (int i = 0; i < regex->NumUnionMembers; i++) {
+		regex->UnionMembers[i]->Index = i;
+	}
+
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
-		prepass_NoUnionEx(member, parentEx);
+		prepass_NoUnionEx(member, regex, parentEx);
 
 		w = imax(w, member->Size.w);
 		h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + member->Size.h;
@@ -270,7 +283,7 @@ void prepass_Regex(Regex* regex, NoUnionEx* parentEx) {
 	regex->WireHeight = wireHeight;
 }
 
-void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
+void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 	mu_Id muid = mu_get_id_noidstack(ctx, &ex, sizeof(NoUnionEx*));
 
 	if (ctx->focus == muid) {
@@ -313,6 +326,21 @@ void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
 				Unit* character = Unit_initWithLiteralChar(RE_NEW(Unit), c);
 				NoUnionEx_AddUnit(ex, character, ex->TextState.CursorPosition);
 				ex->TextState.CursorPosition++;
+			} else if (!TextState_IsSelecting(ex->TextState) && ex->TextState.CursorPosition == 0) {
+				NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
+				int index = previousEx->NumUnits;
+
+				MoveUnitsTo(
+					(UnitRange) {
+						.Ex = ex,
+						.Start = 0,
+						.End = ex->NumUnits - 1,
+					},
+					previousEx,
+					index
+				);
+				ctx->focus = mu_get_id_noidstack(ctx, &previousEx, sizeof(NoUnionEx*));
+				previousEx->TextState.CursorPosition = index;
 			} else {
 				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 				result = TextState_DeleteBackwards(ex->TextState);
@@ -383,6 +411,21 @@ void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
 				// asterisk
 				Unit_SetRepeatMin(previousUnit, 0);
 				Unit_SetRepeatMax(previousUnit, -1);
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '\\') {
+				// pipe
+				NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
+				MoveUnitsTo(
+					(UnitRange) {
+						.Ex = ex,
+						.Start = ex->TextState.CursorPosition,
+						.End = ex->NumUnits - 1,
+					},
+					newEx,
+					0
+				);
+				Regex_AddUnionMember(regex, newEx, ex->Index + 1);
+
+				ctx->focus = mu_get_id_noidstack(ctx, &newEx, sizeof(NoUnionEx*));
 			} else if (previousUnit && previousUnit->Contents.Type == RE_CONTENTS_LITCHAR && previousUnit->Contents.LitChar.C == '\\') { // previous unit is a slash
 				Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
 				Unit_delete(deletedUnit);
@@ -554,6 +597,11 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
 			) {
 				itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
 				itemBeforeCursor->LitChar.C = itemBeforeCursor->Range.Min.C;
+
+				SetItem* newItem = SetItem_init(RE_NEW(SetItem));
+				newItem->LitChar.C = '-';
+				Set_AddItem(set, newItem, set->TextState.CursorPosition);
+				set->TextState.CursorPosition++;
 			} else {
 				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 				result = TextState_DeleteBackwards(set->TextState);
@@ -725,7 +773,7 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
 	mu_layout_set_next(ctx, mu_rect(origin.x + regex->Size.x/2 - PLUS_BUTTON_WIDTH/2, memberOrigin.y, PLUS_BUTTON_WIDTH, 20), 0);
 	if (mu_button(ctx, "+")) {
 		NoUnionEx* newMember = NoUnionEx_init(RE_NEW(NoUnionEx));
-		Regex_AddUnionMember(regex, newMember);
+		Regex_AddUnionMember(regex, newMember, -1);
 
 		Unit* initialUnit = Unit_init(RE_NEW(Unit));
 		NoUnionEx_AddUnit(newMember, initialUnit, -1);
@@ -1460,7 +1508,7 @@ int frame(float dt) {
 	const int GUI_HEIGHT = 500;
 
 	prepass_Regex(regex, NULL);
-	prepass_NoUnionEx(&moveUnitsEx, NULL);
+	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL);
 
 	if (mu_begin_window_ex(ctx, "Test", mu_rect(WINDOW_PADDING, WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, GUI_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(
@@ -1606,7 +1654,7 @@ int frame(float dt) {
 			NoUnionEx* newUnionMember = NoUnionEx_init(RE_NEW(NoUnionEx));
 			Unit* initialUnit = Unit_init(RE_NEW(Unit));
 			NoUnionEx_AddUnit(newUnionMember, initialUnit, -1);
-			Regex_AddUnionMember(newUnit->Contents.Group->Regex, newUnionMember);
+			Regex_AddUnionMember(newUnit->Contents.Group->Regex, newUnionMember, -1);
 		}
 
 		drag = (DragContext) {0};

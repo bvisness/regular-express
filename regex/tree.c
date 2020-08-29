@@ -37,7 +37,7 @@ void doTree_Regex(mu_Context* ctx, Regex* regex) {
 		}
 		if (mu_button(ctx, "+")) {
 			NoUnionEx* ex = NoUnionEx_init(RE_NEW(NoUnionEx));
-			Regex_AddUnionMember(regex, ex);
+			Regex_AddUnionMember(regex, ex, -1);
 
 			Unit* initialUnit = Unit_init(RE_NEW(Unit));
 			NoUnionEx_AddUnit(ex, initialUnit, -1);

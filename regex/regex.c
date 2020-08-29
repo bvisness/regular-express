@@ -2,17 +2,45 @@
 
 const char* SPECIAL_CHARACTERS = "()[]{}*+?.\\|^$";
 
-void Regex_AddUnionMember(Regex* regex, NoUnionEx* ex) {
-    regex->UnionMembers[regex->NumUnionMembers] = ex;
+void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex, int index) {
+    assert(regex->NumUnionMembers < MAX_UNION_MEMBERS);
+
+    ex->Index = index;
+
+    if (index < 0) {
+        regex->UnionMembers[regex->NumUnionMembers] = ex;
+        regex->NumUnionMembers++;
+
+        ex->Index = regex->NumUnionMembers-1;
+
+        return;
+    }
+
+    // shift units over
+    for (int i = regex->NumUnionMembers - 1; i >= index; i--) {
+        regex->UnionMembers[i + 1] = regex->UnionMembers[i];
+        regex->UnionMembers[i + 1]->Index = i + 1;
+    }
+
+    regex->UnionMembers[index] = ex;
     regex->NumUnionMembers++;
 }
 
 NoUnionEx* Regex_RemoveUnionMember(Regex* regex, int index) {
+    assert(regex->NumUnionMembers > 0);
+
+    if (index == -1) {
+        regex->NumUnionMembers--;
+        NoUnionEx* ex = regex->UnionMembers[regex->NumUnionMembers];
+        return ex;
+    }
+
     NoUnionEx* ex = regex->UnionMembers[index];
 
     regex->NumUnionMembers--;
     for (int i = index; i < regex->NumUnionMembers; i++) {
         regex->UnionMembers[i] = regex->UnionMembers[i + 1];
+        regex->UnionMembers[i]->Index = i;
     }
 
     return ex;

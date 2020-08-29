@@ -45,13 +45,14 @@ struct Regex {
     int WireHeight;
 };
 
-void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex);
+void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex, int index);
 struct NoUnionEx* Regex_RemoveUnionMember(Regex* regex, int index);
 
 typedef struct NoUnionEx {
     int NumUnits;
     struct Unit* Units[MAX_UNITS];
 
+    int Index;
     Vec2i Size;
     int WireHeight;
     TextInputState TextState;
