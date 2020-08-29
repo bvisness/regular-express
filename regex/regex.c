@@ -200,6 +200,19 @@ struct SetItem* Set_RemoveItem(Set* set, int index) {
     return item;
 }
 
+const char* Special_GetHumanString(Special* s) {
+    const char* str = "UNKNOWN SPECIAL TYPE";
+    if (s->Type == RE_SPECIAL_STRINGSTART) {
+        str = "start of string";
+    } else if (s->Type == RE_SPECIAL_STRINGEND) {
+        str = "end of string";
+    } else if (s->Type == RE_SPECIAL_ANY) {
+        str = "any";
+    }
+
+    return str;
+}
+
 
 char* toString_Regex(char* base, Regex* regex);
 char* toString_NoUnionEx(char* base, NoUnionEx* ex);

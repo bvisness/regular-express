@@ -222,6 +222,8 @@ const int CURSOR_VERTICAL_PADDING = 2;
 const mu_Color COLOR_RE_TEXT = (mu_Color) { 0, 0, 0, 255 };
 const mu_Color COLOR_WIRE = (mu_Color) { 50, 50, 50, 255 };
 const mu_Color COLOR_CURSOR = (mu_Color) { 45, 83, 252, 255 };
+const mu_Color COLOR_UNIT_BACKGROUND = (mu_Color) { 200, 200, 200, 255 };
+const mu_Color COLOR_SPECIAL_BACKGROUND = (mu_Color) { 170, 225, 170, 255 };
 const mu_Color COLOR_SELECTED_BACKGROUND = (mu_Color) { 122, 130, 255, 255 };
 
 void prepass_Regex(Regex* regex, NoUnionEx* parentEx);
@@ -343,18 +345,44 @@ void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
 			Regex_delete(parseResult);
 		} else if (inputTextLength == 1) {
 			Unit* newUnit = NULL;
-			if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == '[') {
+			if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '[') {
 				newUnit = Unit_init(RE_NEW(Unit));
 				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
 				mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
-			} else if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == '9') {
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '9') {
 				newUnit = Unit_init(RE_NEW(Unit));
 				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
 				mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
-			} else if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == '0') {
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '0') {
 				if (parentEx) {
 					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
 				}
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '6') {
+				// caret
+				newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+				newUnit->Contents.Special->Type = RE_SPECIAL_STRINGSTART;
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '4') {
+				// dollar sign
+				newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+				newUnit->Contents.Special->Type = RE_SPECIAL_STRINGEND;
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '.') {
+				newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+				newUnit->Contents.Special->Type = RE_SPECIAL_ANY;
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '/') {
+				// question mark
+				Unit_SetRepeatMin(previousUnit, 0);
+				Unit_SetRepeatMax(previousUnit, 1);
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '=') {
+				// plus
+				Unit_SetRepeatMin(previousUnit, 1);
+				Unit_SetRepeatMax(previousUnit, -1);
+			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '8') {
+				// asterisk
+				Unit_SetRepeatMin(previousUnit, 0);
+				Unit_SetRepeatMax(previousUnit, -1);
 			} else if (previousUnit && previousUnit->Contents.Type == RE_CONTENTS_LITCHAR && previousUnit->Contents.LitChar.C == '\\') { // previous unit is a slash
 				Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
 				Unit_delete(deletedUnit);
@@ -444,7 +472,10 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex) {
 			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_SPECIAL: {
-			contents->Size = (Vec2i) { .w = 15, .h = UNIT_CONTENTS_MIN_HEIGHT };
+			const char* str = Special_GetHumanString(contents->Special);
+			int width = measureText(str, strlen(str));
+
+			contents->Size = (Vec2i) { .w = width + 20, .h = UNIT_CONTENTS_MIN_HEIGHT };
 			contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
 		} break;
 		case RE_CONTENTS_SET: {
@@ -534,7 +565,7 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
 			for (int i = 0; i < inputTextLength; i++) {
 				do {
 					if (inputTextLength == 1) {
-						if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[i] == ']') {
+						if (ctx->key_down & MU_KEY_ALT && ctx->input_text[i] == ']') {
 							mu_set_focus(ctx, mu_get_id_noidstack(ctx, &ex, sizeof(NoUnionEx*)));
 							break;
 						}
@@ -1017,7 +1048,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 		if (!drag.Type && ctx->mouse_started_drag) {
 			// maybe start drag
 			if (overLeftHandle) {
-				if (ctx->key_down & MU_KEY_CTRL) {
+				if (ctx->key_down & MU_KEY_ALT) {
 					UnitRange units = (UnitRange) {
 						.Ex = parent,
 						.Start = unit->Index,
@@ -1047,7 +1078,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 					};
 				}
 			} else if (overRightHandle) {
-				if (ctx->key_down & MU_KEY_CTRL) {
+				if (ctx->key_down & MU_KEY_ALT) {
 					Unit* next = Unit_Next(unit);
 					if (next) {
 						UnitRange units = (UnitRange) {
@@ -1257,7 +1288,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 	mu_Rect r = mu_rect(origin.x, origin.y, contents->Size.w, contents->Size.h);
 	contents->LastRect = r;
 
-	mu_Color backgroundColor = selected ? COLOR_SELECTED_BACKGROUND : mu_color(200, 200, 200, 255);
+	mu_Color backgroundColor = selected ? COLOR_SELECTED_BACKGROUND : COLOR_UNIT_BACKGROUND;
 
 	mu_layout_set_next(ctx, r, 0);
 	switch (contents->Type) {
@@ -1276,8 +1307,13 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_SPECIAL: {
-			// TODO: DO IT
-			mu_draw_rect(ctx, r, backgroundColor);
+			mu_draw_rect(ctx, r, selected ? backgroundColor : COLOR_SPECIAL_BACKGROUND);
+
+			Special* s = contents->Special;
+
+			const char* str = Special_GetHumanString(s);
+			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
 		case RE_CONTENTS_SET: {
 			// TODO: Set

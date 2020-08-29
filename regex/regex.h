@@ -171,6 +171,8 @@ typedef struct Special {
     int Type;
 } Special;
 
+const char* Special_GetHumanString(Special* s);
+
 char* ToString(Regex* regex);
 
 #endif
