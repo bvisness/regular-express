@@ -331,7 +331,7 @@ char* toString_UnitContents(char* base, UnitContents* contents) {
             base = toString_LitChar(base, &contents->LitChar);
         } break;
         case RE_CONTENTS_METACHAR: {
-            base = toString_MetaChar(base, contents->MetaChar);
+            base = toString_MetaChar(base, &contents->MetaChar);
         } break;
     }
 

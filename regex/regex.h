@@ -69,11 +69,19 @@ typedef struct LitChar {
     };
 } LitChar;
 
+typedef struct MetaChar {
+    char _backslash;
+    union {
+        char C;
+        char _buf[2];
+    };
+} MetaChar;
+
 typedef struct UnitContents {
     int Type;
 
     struct LitChar LitChar;
-    struct MetaChar* MetaChar;
+    struct MetaChar MetaChar;
     struct Special* Special;
     struct Set* Set;
     struct Group* Group;
@@ -162,14 +170,6 @@ typedef struct SetItem {
 typedef struct Special {
     int Type;
 } Special;
-
-typedef struct MetaChar {
-    char _backslash;
-    union {
-        char C;
-        char _buf[2];
-    };
-} MetaChar;
 
 char* ToString(Regex* regex);
 

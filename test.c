@@ -279,6 +279,11 @@ void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
 
 		int doSelection = ctx->key_down & MU_KEY_SHIFT;
 
+		Unit* previousUnit = NULL;
+		if (ex->TextState.CursorPosition > 0) {
+			previousUnit = ex->Units[ex->TextState.CursorPosition - 1];
+		}
+
 		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
 			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
 			ex->TextState = TextState_BumpCursor(ex->TextState, -1, doSelection);
@@ -292,8 +297,24 @@ void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
 			ctx->key_pressed &= ~MU_KEY_END;
 			ex->TextState = TextState_SetCursorPosition(ex->TextState, ex->NumUnits, doSelection);
 		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
-			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-			result = TextState_DeleteBackwards(ex->TextState);
+			if (!TextState_IsSelecting(ex->TextState) && previousUnit && previousUnit->Contents.Type == RE_CONTENTS_METACHAR) {
+				char c = previousUnit->Contents.MetaChar.C;
+
+				Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
+				Unit_delete(deletedUnit);
+				ex->TextState.CursorPosition--;
+
+				Unit* backslash = Unit_initWithLiteralChar(RE_NEW(Unit), '\\');
+				NoUnionEx_AddUnit(ex, backslash, ex->TextState.CursorPosition);
+				ex->TextState.CursorPosition++;
+
+				Unit* character = Unit_initWithLiteralChar(RE_NEW(Unit), c);
+				NoUnionEx_AddUnit(ex, character, ex->TextState.CursorPosition);
+				ex->TextState.CursorPosition++;
+			} else {
+				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+				result = TextState_DeleteBackwards(ex->TextState);
+			}
 		} else if (ctx->key_pressed & MU_KEY_DELETE) {
 			ctx->key_pressed &= ~MU_KEY_DELETE;
 			result = TextState_DeleteForwards(ex->TextState);
@@ -334,6 +355,14 @@ void prepass_NoUnionEx(NoUnionEx* ex, NoUnionEx* parentEx) {
 				if (parentEx) {
 					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
 				}
+			} else if (previousUnit && previousUnit->Contents.Type == RE_CONTENTS_LITCHAR && previousUnit->Contents.LitChar.C == '\\') { // previous unit is a slash
+				Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
+				Unit_delete(deletedUnit);
+				ex->TextState.CursorPosition--;
+
+				newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = ctx->input_text[0];
 			} else {
 				newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[0]);
 			}
@@ -1242,7 +1271,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
 		case RE_CONTENTS_METACHAR: {
 			mu_draw_rect(ctx, r, backgroundColor);
 
-			char* str = &contents->MetaChar->_backslash;
+			char* str = &contents->MetaChar._backslash;
 			mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
 			draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
 		} break;
@@ -1392,7 +1421,7 @@ int frame(float dt) {
 
 	const int PAGE_WIDTH = 800;
 	const int WINDOW_PADDING = 10;
-	const int GUI_HEIGHT = 300;
+	const int GUI_HEIGHT = 500;
 
 	prepass_Regex(regex, NULL);
 	prepass_NoUnionEx(&moveUnitsEx, NULL);
@@ -1523,7 +1552,7 @@ int frame(float dt) {
 		mu_end_window(ctx);
 	}
 
-	if (mu_begin_window(ctx, "Tree View", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 400))) {
+	if (mu_begin_window(ctx, "Tree View", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 300))) {
 		doTree(ctx, regex);
 
 		mu_end_window(ctx);

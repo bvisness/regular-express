@@ -140,7 +140,7 @@ void doTree_Unit(mu_Context* ctx, Unit* unit) {
 				doTree_LitChar(ctx, &unit->Contents.LitChar);
 			} break;
 			case RE_CONTENTS_METACHAR: {
-				doTree_MetaChar(ctx, unit->Contents.MetaChar);
+				doTree_MetaChar(ctx, &unit->Contents.MetaChar);
 			} break;
 			case RE_CONTENTS_SPECIAL: {
 				mu_label(ctx, "Special guy!!"); // TODO: You know

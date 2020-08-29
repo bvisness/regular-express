@@ -49,10 +49,9 @@ void LitChar_init(LitChar* c) {
 	// nothing for now; maybe give it a default?
 }
 
-MetaChar* MetaChar_init(MetaChar* c) {
+void MetaChar_init(MetaChar* c) {
 	c->_backslash = '\\';
 	c->C = 'a';
-	return c;
 }
 
 Special* Special_init(Special* special) {
@@ -98,9 +97,7 @@ void UnitContents_SetType(UnitContents* contents, int type) {
 			LitChar_init(&contents->LitChar);
 		} break;
 		case RE_CONTENTS_METACHAR: {
-			if (!contents->MetaChar) {
-				contents->MetaChar = MetaChar_init(RE_NEW(MetaChar));
-			}
+			MetaChar_init(&contents->MetaChar);
 		} break;
 		case RE_CONTENTS_SPECIAL: {
 			if (!contents->Special) {
@@ -138,9 +135,6 @@ void NoUnionEx_delete(NoUnionEx* ex) {
 
 void Unit_delete(Unit* unit) {
 	UnitContents* contents = &unit->Contents;
-	if (contents->MetaChar) {
-		MetaChar_delete(contents->MetaChar);
-	}
 	if (contents->Special) {
 		Special_delete(contents->Special);
 	}
@@ -152,10 +146,6 @@ void Unit_delete(Unit* unit) {
 	}
 
 	RE_FREE(Unit, unit);
-}
-
-void MetaChar_delete(MetaChar* c) {
-	RE_FREE(MetaChar, c);
 }
 
 void Special_delete(Special* special) {
