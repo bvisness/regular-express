@@ -173,17 +173,27 @@
 			console.log(test.exports);
 			window.regex = test.exports;
 
+			let awake = false;
+			function wakeUp() {
+				if (awake) {
+					return;
+				}
+
+				awake = true;
+				window.requestAnimationFrame(doFrame);
+			}
+
 			canvas.addEventListener('mousemove', e => {
 				test.exports.mouseMove(e.clientX, e.clientY);
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			});
 			canvas.addEventListener('mousedown', e => {
 				test.exports.mouseDown(e.clientX, e.clientY);
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			});
 			canvas.addEventListener('mouseup', e => {
 				test.exports.mouseUp(e.clientX, e.clientY);
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			});
 
 			function specialKeyEvent(downOrUp, e) {
@@ -230,7 +240,7 @@
 					func(1 << 11);
 				}
 
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			}
 			window.addEventListener('keydown', e => {
 				if (e.key.length > 1) {
@@ -244,13 +254,13 @@
 					test.exports.textInput();
 					e.preventDefault();
 				}
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			});
 			window.addEventListener('keyup', e => {
 				if (e.key.length > 1) {
 					specialKeyEvent('up', e);
 				}
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			});
 
 			window.addEventListener('paste', e => {
@@ -259,7 +269,7 @@
 					e.clipboardData.getData('text/plain')
 				);
 				test.exports.textInput();
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			});
 			window.addEventListener('wheel', e => {
 				let x = e.deltaX;
@@ -272,7 +282,7 @@
 				}
 
 				test.exports.scroll(x, y);
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			});
 
 			function updateCanvasSize() {
@@ -285,7 +295,7 @@
 				textHeight = ctx.measureText('NothinBelowTheBaseline').actualBoundingBoxDescent;
 				test.exports.setTextHeight(textHeight / dpr);
 
-				window.requestAnimationFrame(doFrame);
+				wakeUp();
 			}
 			updateCanvasSize();
 			window.addEventListener('resize', () => { updateCanvasSize(); });
@@ -305,9 +315,11 @@
 
 				if (animating) {
 					window.requestAnimationFrame(doFrame);
+				} else {
+					awake = false;
 				}
 			}
-			window.requestAnimationFrame(doFrame);
+			wakeUp();
 		}
 		init();
 	</script>
