@@ -11,3 +11,15 @@ unsigned long strlen(const char* str) {
 
 	return len;
 }
+
+char* strchr(const char* str, int ch) {
+    char* i = (char*) str;
+    while (*i) {
+        if (*i == ch) {
+            return i;
+        }
+        i++;
+    }
+
+    return NULL;
+}

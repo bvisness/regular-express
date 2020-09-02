@@ -230,6 +230,8 @@ const mu_Color COLOR_UNIT_BACKGROUND = (mu_Color) { 200, 200, 200, 255 };
 const mu_Color COLOR_SPECIAL_BACKGROUND = (mu_Color) { 170, 225, 170, 255 };
 const mu_Color COLOR_SELECTED_BACKGROUND = (mu_Color) { 122, 130, 255, 255 };
 
+const char* LEGAL_METACHARS = "dDwWsSbBnt";
+
 void prepass_Regex(Regex* regex, NoUnionEx* parentEx);
 void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx);
 void prepass_Unit(Unit* unit, NoUnionEx* ex);
@@ -426,7 +428,12 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 				Regex_AddUnionMember(regex, newEx, ex->Index + 1);
 
 				ctx->focus = mu_get_id_noidstack(ctx, &newEx, sizeof(NoUnionEx*));
-			} else if (previousUnit && previousUnit->Contents.Type == RE_CONTENTS_LITCHAR && previousUnit->Contents.LitChar.C == '\\') { // previous unit is a slash
+			} else if (previousUnit
+						&& previousUnit->Contents.Type == RE_CONTENTS_LITCHAR
+						&& previousUnit->Contents.LitChar.C == '\\'
+						&& strchr(LEGAL_METACHARS, ctx->input_text[0])
+			) {
+				// previous unit is a slash, do a metachar
 				Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
 				Unit_delete(deletedUnit);
 				ex->TextState.CursorPosition--;
