@@ -294,62 +294,47 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 		TextEditResult result = (TextEditResult) { .ResultState = ex->TextState };
 		int inputTextLength = strlen(ctx->input_text);
 
-		int doSelection = ctx->key_down & MU_KEY_SHIFT;
-
 		Unit* previousUnit = NULL;
 		if (ex->TextState.CursorPosition > 0) {
 			previousUnit = ex->Units[ex->TextState.CursorPosition - 1];
 		}
 
-		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-			ex->TextState = TextState_BumpCursor(ex->TextState, -1, doSelection);
-		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-			ex->TextState = TextState_BumpCursor(ex->TextState, 1, doSelection);
-		} else if (ctx->key_pressed & MU_KEY_HOME) {
-			ctx->key_pressed &= ~MU_KEY_HOME;
-			ex->TextState = TextState_SetCursorPosition(ex->TextState, 0, doSelection);
-		} else if (ctx->key_pressed & MU_KEY_END) {
-			ctx->key_pressed &= ~MU_KEY_END;
-			ex->TextState = TextState_SetCursorPosition(ex->TextState, ex->NumUnits, doSelection);
-		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
-			if (!TextState_IsSelecting(ex->TextState) && previousUnit && previousUnit->Contents.Type == RE_CONTENTS_METACHAR) {
-				char c = previousUnit->Contents.MetaChar.C;
+		if (ctx->key_pressed & MU_KEY_BACKSPACE
+				&& !TextState_IsSelecting(ex->TextState)
+				&& previousUnit
+				&& previousUnit->Contents.Type == RE_CONTENTS_METACHAR
+		) {
+			char c = previousUnit->Contents.MetaChar.C;
 
-				Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
-				Unit_delete(deletedUnit);
-				ex->TextState.CursorPosition--;
+			Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
+			Unit_delete(deletedUnit);
+			ex->TextState.CursorPosition--;
 
-				Unit* backslash = Unit_initWithLiteralChar(RE_NEW(Unit), '\\');
-				NoUnionEx_AddUnit(ex, backslash, ex->TextState.CursorPosition);
-				ex->TextState.CursorPosition++;
+			Unit* backslash = Unit_initWithLiteralChar(RE_NEW(Unit), '\\');
+			NoUnionEx_AddUnit(ex, backslash, ex->TextState.CursorPosition);
+			ex->TextState.CursorPosition++;
 
-				Unit* character = Unit_initWithLiteralChar(RE_NEW(Unit), c);
-				NoUnionEx_AddUnit(ex, character, ex->TextState.CursorPosition);
-				ex->TextState.CursorPosition++;
-			} else if (!TextState_IsSelecting(ex->TextState) && ex->TextState.CursorPosition == 0) {
-				NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
-				int index = previousEx->NumUnits;
+			Unit* character = Unit_initWithLiteralChar(RE_NEW(Unit), c);
+			NoUnionEx_AddUnit(ex, character, ex->TextState.CursorPosition);
+			ex->TextState.CursorPosition++;
+		} else if (ctx->key_pressed & MU_KEY_BACKSPACE
+				&& !TextState_IsSelecting(ex->TextState)
+				&& ex->TextState.CursorPosition == 0
+		) {
+			NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
+			int index = previousEx->NumUnits;
 
-				MoveUnitsTo(
-					(UnitRange) {
-						.Ex = ex,
-						.Start = 0,
-						.End = ex->NumUnits - 1,
-					},
-					previousEx,
-					index
-				);
-				ctx->focus = mu_get_id_noidstack(ctx, &previousEx, sizeof(NoUnionEx*));
-				previousEx->TextState.CursorPosition = index;
-			} else {
-				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-				result = TextState_DeleteBackwards(ex->TextState);
-			}
-		} else if (ctx->key_pressed & MU_KEY_DELETE) {
-			ctx->key_pressed &= ~MU_KEY_DELETE;
-			result = TextState_DeleteForwards(ex->TextState);
+			MoveUnitsTo(
+				(UnitRange) {
+					.Ex = ex,
+					.Start = 0,
+					.End = ex->NumUnits - 1,
+				},
+				previousEx,
+				index
+			);
+			ctx->focus = mu_get_id_noidstack(ctx, &previousEx, sizeof(NoUnionEx*));
+			previousEx->TextState.CursorPosition = index;
 		} else if (inputTextLength > 1) {
 			// assume we are pasting and want to parse a regex
 			// TODO: We should probably explicitly detect that we are pasting.
@@ -373,7 +358,23 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 			}
 
 			Regex_delete(parseResult);
-		} else if (inputTextLength == 1) {
+		} else {
+			result = StandardTextInput(ctx, ex->TextState, ex->NumUnits);
+		}
+
+		if (result.DoDelete) {
+			result.DeleteMin = iclamp(result.DeleteMin, 0, ex->NumUnits);
+			result.DeleteMax = iclamp(result.DeleteMax, 0, ex->NumUnits);
+
+			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
+				Unit* deleted = NoUnionEx_RemoveUnit(ex, result.DeleteMin);
+				Unit_delete(deleted);
+			}
+		}
+
+		ex->TextState = result.ResultState;
+
+		if (result.DoInput && inputTextLength == 1) {
 			Unit* newUnit = NULL;
 			if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '[') {
 				newUnit = Unit_init(RE_NEW(Unit));
@@ -451,18 +452,6 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 			}
 
 			ctx->input_text[0] = 0;
-		}
-
-		if (result.DoDelete) {
-			result.DeleteMin = iclamp(result.DeleteMin, 0, ex->NumUnits);
-			result.DeleteMax = iclamp(result.DeleteMax, 0, ex->NumUnits);
-
-			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
-				Unit* deleted = NoUnionEx_RemoveUnit(ex, result.DeleteMin);
-				Unit_delete(deleted);
-			}
-
-			ex->TextState = result.ResultState;
 		}
 
 		// fix up cursor position
@@ -578,45 +567,41 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
 			? set->Items[set->TextState.CursorPosition - 1]
 			: NULL
 		);
-		if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-			set->TextState = TextState_BumpCursor(set->TextState, -1, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
-			ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-			set->TextState = TextState_BumpCursor(set->TextState, 1, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_HOME) {
-			ctx->key_pressed &= ~MU_KEY_HOME;
-			set->TextState = TextState_SetCursorPosition(set->TextState, 0, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_END) {
-			ctx->key_pressed &= ~MU_KEY_END;
-			set->TextState = TextState_SetCursorPosition(set->TextState, set->NumItems, 0); // TODO: Selection
-		} else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
-			if (
-				itemBeforeCursor
+
+		if (ctx->key_pressed & MU_KEY_BACKSPACE
+				&& itemBeforeCursor
 				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
 				&& itemBeforeCursor->Range.Max.C != 0
-			) {
-				itemBeforeCursor->Range.Max.C = 0;
-			} else if (
-				itemBeforeCursor
+		) {
+			itemBeforeCursor->Range.Max.C = 0;
+		} else if (ctx->key_pressed & MU_KEY_BACKSPACE
+				&& itemBeforeCursor
 				&& itemBeforeCursor->Type == RE_SETITEM_RANGE
 				&& itemBeforeCursor->Range.Max.C == 0
-			) {
-				itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
-				itemBeforeCursor->LitChar.C = itemBeforeCursor->Range.Min.C;
+		) {
+			itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
+			itemBeforeCursor->LitChar.C = itemBeforeCursor->Range.Min.C;
 
-				SetItem* newItem = SetItem_init(RE_NEW(SetItem));
-				newItem->LitChar.C = '-';
-				Set_AddItem(set, newItem, set->TextState.CursorPosition);
-				set->TextState.CursorPosition++;
-			} else {
-				ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-				result = TextState_DeleteBackwards(set->TextState);
+			SetItem* newItem = SetItem_init(RE_NEW(SetItem));
+			newItem->LitChar.C = '-';
+			Set_AddItem(set, newItem, set->TextState.CursorPosition);
+			set->TextState.CursorPosition++;
+		} else {
+			result = StandardTextInput(ctx, set->TextState, set->NumItems);
+		}
+
+		if (result.DoDelete) {
+			result.DeleteMin = iclamp(result.DeleteMin, 0, set->NumItems);
+			result.DeleteMax = iclamp(result.DeleteMax, 0, set->NumItems);
+
+			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
+				Set_RemoveItem(set, result.DeleteMin);
 			}
-		} else if (ctx->key_pressed & MU_KEY_DELETE) {
-			ctx->key_pressed &= ~MU_KEY_DELETE;
-			result = TextState_DeleteForwards(set->TextState);
-		} else if (inputTextLength > 0) {
+		}
+
+		set->TextState = result.ResultState;
+
+		if (result.DoInput) {
 			for (int i = 0; i < inputTextLength; i++) {
 				do {
 					if (inputTextLength == 1) {
@@ -651,17 +636,6 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
 					set->TextState.CursorPosition++;
 				} while (0);
 			}
-		}
-
-		if (result.DoDelete) {
-			result.DeleteMin = iclamp(result.DeleteMin, 0, set->NumItems);
-			result.DeleteMax = iclamp(result.DeleteMax, 0, set->NumItems);
-
-			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
-				Set_RemoveItem(set, result.DeleteMin);
-			}
-
-			set->TextState = result.ResultState;
 		}
 
 		// fix up cursor position
@@ -1394,8 +1368,10 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 	for (int i = 0; i < set->NumItems; i++) {
 		SetItem* item = set->Items[i];
 
+		int selected = TextState_IsSelected(set->TextState, i);
+
 		mu_Rect itemRect = mu_rect(itemX, itemY, item->Size.w, item->Size.h);
-		mu_draw_rect(ctx, itemRect, mu_color(160, 160, 160, 255));
+		mu_draw_rect(ctx, itemRect, selected ? COLOR_SELECTED_BACKGROUND : mu_color(160, 160, 160, 255));
 
 		if (item->Type == RE_SETITEM_LITCHAR) {
 			mu_layout_set_next(ctx, itemRect, 0);

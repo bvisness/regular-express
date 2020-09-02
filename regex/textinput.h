@@ -1,6 +1,8 @@
 #ifndef TEXTINPUT_H
 #define TEXTINPUT_H
 
+#include "../microui.h"
+
 typedef struct TextInputState {
     int CursorPosition;
     int SelectionBase;
@@ -22,6 +24,8 @@ typedef struct TextEditResult {
     int DeleteMin;
     int DeleteMax;
 
+    int DoInput;
+
     TextInputState ResultState;
 
     /*
@@ -34,5 +38,7 @@ typedef struct TextEditResult {
 TextEditResult TextState_DeleteBackwards(TextInputState state);
 TextEditResult TextState_DeleteForwards(TextInputState state);
 TextEditResult TextState_InsertString(TextInputState state);
+
+TextEditResult StandardTextInput(mu_Context* ctx, TextInputState textState, int maxIndex);
 
 #endif

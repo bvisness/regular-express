@@ -2,6 +2,8 @@
 
 #include "../util/util.h"
 
+#include <stdio.h>
+
 const TextInputState DEFAULT_TEXT_INPUT_STATE = (TextInputState) {
     .CursorPosition = 0,
     .SelectionBase = -1,
@@ -145,4 +147,38 @@ TextEditResult TextState_InsertString(TextInputState state) {
     };
 
     return result;
+}
+
+TextEditResult StandardTextInput(mu_Context* ctx, TextInputState textState, int maxIndex) {
+    int doSelection = ctx->key_down & MU_KEY_SHIFT;
+
+    if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
+        ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+        return (TextEditResult) { .ResultState = TextState_BumpCursor(textState, -1, doSelection) };
+    } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
+        ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+        return (TextEditResult) { .ResultState = TextState_BumpCursor(textState, 1, doSelection) };
+    } else if (ctx->key_pressed & MU_KEY_HOME) {
+        ctx->key_pressed &= ~MU_KEY_HOME;
+        return (TextEditResult) { .ResultState = TextState_SetCursorPosition(textState, 0, doSelection) };
+    } else if (ctx->key_pressed & MU_KEY_END) {
+        ctx->key_pressed &= ~MU_KEY_END;
+        return (TextEditResult) { .ResultState = TextState_SetCursorPosition(textState, maxIndex, doSelection) };
+    } else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
+        ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+        return TextState_DeleteBackwards(textState);
+    } else if (ctx->key_pressed & MU_KEY_DELETE) {
+        ctx->key_pressed &= ~MU_KEY_DELETE;
+        return TextState_DeleteForwards(textState);
+    } else if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == 'a') {
+        ctx->input_text[0] = 0;
+        return (TextEditResult) {
+            .ResultState = (TextInputState) {
+                .CursorPosition = maxIndex,
+                .SelectionBase = 0,
+            },
+        };
+    } else {
+        return (TextEditResult) { .DoInput = 1, .ResultState = textState };
+    }
 }

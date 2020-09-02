@@ -247,9 +247,8 @@
 					specialKeyEvent('down', e);
 				} else if (
 					!e.ctrlKey
-					// || '[]9046.'.indexOf(e.key) > -1 // TODO: Are there any Alt shortcuts that the browser would normally do?
+					|| 'a'.indexOf(e.key) > -1
 				) {
-					console.log(e);
 					putString(test.exports.textInputBuf, e.key);
 					test.exports.textInput();
 					e.preventDefault();
