@@ -137,9 +137,29 @@
 							ctx.rect(x * dpr, y * dpr, w * dpr, h * dpr);
 							ctx.clip();
 						},
-						canvas_rect: (x, y, w, h, r, g, b, a) => {
-							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
-							ctx.fillRect(x * dpr, y * dpr, w * dpr, h * dpr);
+						canvas_rect: (x, y, w, h, r, red, green, blue, alpha) => {
+							r = Math.min(r, w / 2, h / 2);
+
+							const dx = x * dpr;
+							const dy = y * dpr;
+							const dr = r * dpr;
+
+							const diw = (w - (2 * r)) * dpr; // device inner width
+							const dih = (h - (2 * r)) * dpr; // device inner height
+
+							ctx.beginPath();
+							ctx.moveTo(dx + dr, dy);
+							ctx.lineTo(dx + dr + diw, dy);
+							ctx.arc(dx + dr + diw, dy + dr, dr, -Math.PI/2, 0);
+							ctx.lineTo(dx + dr + diw + dr, dy + dr + dih);
+							ctx.arc(dx + dr + diw, dy + dr + dih, dr, 0, Math.PI/2);
+							ctx.lineTo(dx + dr, dy + dr + dih + dr);
+							ctx.arc(dx + dr, dy + dr + dih, dr, Math.PI/2, Math.PI);
+							ctx.lineTo(dx, dy + dr);
+							ctx.arc(dx + dr, dy + dr, dr, Math.PI, (3*Math.PI)/2);
+
+							ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha/255})`;
+							ctx.fill();
 						},
 						canvas_circle: (x, y, radius, r, g, b, a) => {
 							ctx.beginPath();

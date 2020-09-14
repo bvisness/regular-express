@@ -511,6 +511,19 @@ void mu_draw_rect(mu_Context *ctx, mu_Rect rect, mu_Color color) {
     cmd = mu_push_command(ctx, MU_COMMAND_RECT, sizeof(mu_RectCommand));
     cmd->rect.rect = rect;
     cmd->rect.color = color;
+    cmd->rect.radius = 0;
+  }
+}
+
+
+void mu_draw_rounded_rect(mu_Context *ctx, mu_Rect rect, mu_Color color, int radius) {
+  mu_Command *cmd;
+  rect = intersect_rects(rect, mu_get_clip_rect(ctx));
+  if (rect.w > 0 && rect.h > 0) {
+    cmd = mu_push_command(ctx, MU_COMMAND_RECT, sizeof(mu_RectCommand));
+    cmd->rect.rect = rect;
+    cmd->rect.color = color;
+    cmd->rect.radius = radius;
   }
 }
 

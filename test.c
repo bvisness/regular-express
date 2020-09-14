@@ -18,7 +18,7 @@
 extern void canvas_clear();
 extern void canvas_clip(int x, int y, int w, int h);
 extern void canvas_setFillRGB();
-extern void canvas_rect(int x, int y, int w, int h, COLORPARAMS);
+extern void canvas_rect(int x, int y, int w, int h, int radius, COLORPARAMS);
 extern void canvas_text(char* str, int x, int y, COLORPARAMS);
 extern void canvas_circle(int x, int y, float radius, COLORPARAMS);
 
@@ -934,7 +934,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	if (shouldShowLeftHandle) {
 		int handleX = origin.x + unit->LeftHandleZoneWidth/2 - HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
-		mu_draw_rect(ctx, handleRect, COLOR_WIRE);
+		mu_draw_rounded_rect(ctx, handleRect, COLOR_WIRE, 3);
 		leftHandleRect = handleRect;
 		overLeftHandle = mu_mouse_over(ctx, handleRect);
 	}
@@ -948,7 +948,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 			+ unit->RightHandleZoneWidth/2
 			- HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
-		mu_draw_rect(ctx, handleRect, COLOR_WIRE);
+		mu_draw_rounded_rect(ctx, handleRect, COLOR_WIRE, 3);
 		rightHandleRect = handleRect;
 		overRightHandle = mu_mouse_over(ctx, handleRect);
 	}
@@ -1456,10 +1456,11 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 }
 
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected) {
-	mu_draw_rect(
+	mu_draw_rounded_rect(
 		ctx,
 		mu_rect(origin.x, origin.y, group->Size.w, group->Size.h),
-		selected ? COLOR_SELECTED_BACKGROUND : mu_color(0, 0, 0, 25)
+		selected ? COLOR_SELECTED_BACKGROUND : mu_color(0, 0, 0, 25),
+		4
 	);
 
 	drawRailroad_Regex(
@@ -1658,7 +1659,7 @@ int frame(float dt) {
 			case MU_COMMAND_RECT: {
 				mu_Color color = cmd->rect.color;
 				mu_Rect rect = cmd->rect.rect;
-				canvas_rect(rect.x, rect.y, rect.w, rect.h, color.r, color.g, color.b, color.a);
+				canvas_rect(rect.x, rect.y, rect.w, rect.h, cmd->rect.radius, color.r, color.g, color.b, color.a);
 				break;
 			}
 			// case MU_COMMAND_ICON: r_draw_icon(cmd->icon.id, cmd->icon.rect, cmd->icon.color); break;
