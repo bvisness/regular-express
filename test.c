@@ -15,12 +15,15 @@
 
 #define COLORPARAMS unsigned char r, unsigned char g, unsigned char b, unsigned char a
 
+#define PI 3.1415926
+
 extern void canvas_clear();
 extern void canvas_clip(int x, int y, int w, int h);
 extern void canvas_setFillRGB();
 extern void canvas_rect(int x, int y, int w, int h, int radius, COLORPARAMS);
 extern void canvas_text(char* str, int x, int y, COLORPARAMS);
-extern void canvas_circle(int x, int y, float radius, COLORPARAMS);
+extern void canvas_line(int x1, int y1, int x2, int y2, COLORPARAMS, int strokeWidth);
+extern void canvas_arc(int x, int y, int radius, float angleStart, float angleEnd, COLORPARAMS, int strokeWidth);
 
 extern int measureText(const char* text, int len);
 
@@ -1668,9 +1671,14 @@ int frame(float dt) {
 				canvas_clip(rect.x, rect.y, rect.w, rect.h);
 				break;
 			}
-			case MU_COMMAND_CIRCLE: {
-				mu_Color color = cmd->circle.color;
-				canvas_circle(cmd->circle.x, cmd->circle.y, cmd->circle.radius, color.r, color.g, color.b, color.a);
+			case MU_COMMAND_LINE: {
+				mu_Color color = cmd->line.color;
+				canvas_line(cmd->line.x1, cmd->line.y1, cmd->line.x2, cmd->line.y2, color.r, color.g, color.b, color.a, cmd->line.strokeWidth);
+				break;
+			}
+			case MU_COMMAND_ARC: {
+				mu_Color color = cmd->arc.color;
+				canvas_arc(cmd->arc.x, cmd->arc.y, cmd->arc.radius, cmd->arc.angleStart, cmd->arc.angleEnd, color.r, color.g, color.b, color.a, cmd->arc.strokeWidth);
 				break;
 			}
 		}

@@ -161,16 +161,28 @@
 							ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha/255})`;
 							ctx.fill();
 						},
-						canvas_circle: (x, y, radius, r, g, b, a) => {
-							ctx.beginPath();
-							ctx.arc(x * dpr, y * dpr, radius * dpr, 0, 2 * Math.PI);
-							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-							ctx.fill();
-						},
 						canvas_text: (strPtr, x, y, r, g, b, a) => {
 							const str = getString(strPtr);
 							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
 							ctx.fillText(str, x * dpr, y * dpr);
+						},
+						canvas_line: (x1, y1, x2, y2, r, g, b, a, strokeWidth) => {
+							ctx.beginPath();
+							ctx.moveTo(x1 * dpr, y1 * dpr);
+							ctx.lineTo(x2 * dpr, y2 * dpr);
+
+							ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
+							ctx.lineWidth = strokeWidth;
+							ctx.stroke();
+						},
+						canvas_arc: (x, y, radius, angleStart, angleEnd, r, g, b, a, strokeWidth) => {
+
+							ctx.beginPath();
+							ctx.arc(x, y, radius, -angleStart, -angleEnd, true);
+
+							ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
+							ctx.lineWidth = strokeWidth;
+							ctx.stroke();
 						},
 
 						measureText: (strPtr, len) => {

@@ -575,14 +575,60 @@ void mu_draw_icon(mu_Context *ctx, int id, mu_Rect rect, mu_Color color) {
 }
 
 
-void mu_draw_circle(mu_Context *ctx, int x, int y, float radius, mu_Color color) {
+void mu_draw_line(mu_Context *ctx, int x1, int y1, int x2, int y2, mu_Color color, int strokeWidth) {
   mu_Command *cmd;
-  cmd = mu_push_command(ctx, MU_COMMAND_CIRCLE, sizeof(mu_CircleCommand));
-  cmd->circle.x = x;
-  cmd->circle.y = y;
-  cmd->circle.radius = radius;
-  cmd->circle.color = color;
+
+  int w = x2 - x1;
+  int h = y2 - y1;
+
+  mu_Rect boundingRect = mu_rect(
+    x1 < x2 ? x1 : x2,
+    y1 < y2 ? y1 : y2,
+    w < 0 ? -w : w,
+    h < 0 ? -h : h
+  );
+
+  int clipped = mu_check_clip(ctx, boundingRect);
+  if (clipped == MU_CLIP_ALL ) { return; }
+  if (clipped == MU_CLIP_PART) { mu_set_clip(ctx, mu_get_clip_rect(ctx)); }
+
+  cmd = mu_push_command(ctx, MU_COMMAND_LINE, sizeof(mu_LineCommand));
+  cmd->line.x1 = x1;
+  cmd->line.y1 = y1;
+  cmd->line.x2 = x2;
+  cmd->line.y2 = y2;
+  cmd->line.color = color;
+  cmd->line.strokeWidth = strokeWidth;
+
+  if (clipped) { mu_set_clip(ctx, unclipped_rect); }
 }
+
+
+void mu_draw_arc(mu_Context *ctx, int x, int y, int radius, float angleStart, float angleEnd, mu_Color color, int strokeWidth) {
+  mu_Command *cmd;
+
+  int clipped = mu_check_clip(ctx, mu_rect(
+    x - radius - strokeWidth,
+    y - radius - strokeWidth,
+    (radius + strokeWidth) * 2,
+    (radius + strokeWidth) * 2
+  ));
+  if (clipped == MU_CLIP_ALL ) { return; }
+  if (clipped == MU_CLIP_PART) { mu_set_clip(ctx, mu_get_clip_rect(ctx)); }
+
+  cmd = mu_push_command(ctx, MU_COMMAND_ARC, sizeof(mu_ArcCommand));
+  cmd->arc.x = x;
+  cmd->arc.y = y;
+  cmd->arc.radius = radius;
+  cmd->arc.angleStart = angleStart;
+  cmd->arc.angleEnd = angleEnd;
+  cmd->arc.color = color;
+  cmd->arc.strokeWidth = strokeWidth;
+
+  if (clipped) { mu_set_clip(ctx, unclipped_rect); }
+}
+
+
 
 
 /*============================================================================
