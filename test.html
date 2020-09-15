@@ -172,16 +172,25 @@
 							ctx.lineTo(x2 * dpr, y2 * dpr);
 
 							ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
-							ctx.lineWidth = strokeWidth;
+							ctx.lineWidth = strokeWidth * dpr;
 							ctx.stroke();
 						},
 						canvas_arc: (x, y, radius, angleStart, angleEnd, r, g, b, a, strokeWidth) => {
 
 							ctx.beginPath();
-							ctx.arc(x, y, radius, -angleStart, -angleEnd, true);
+							ctx.arc(x * dpr, y * dpr, radius * dpr, -angleStart, -angleEnd - 0.001, true);
+							/*
+							The 0.001 is because Firefox has some dumb bug where
+							it doesn't draw all the way to the end of the arc and
+							leaves some empty pixels. Lines don't join up with arcs
+							nicely because of it. It sucks but a little bias seems
+							to "fix" it.
+
+							Bug report: https://bugzilla.mozilla.org/show_bug.cgi?id=1664959
+							*/
 
 							ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
-							ctx.lineWidth = strokeWidth;
+							ctx.lineWidth = strokeWidth * dpr;
 							ctx.stroke();
 						},
 

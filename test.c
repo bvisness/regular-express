@@ -15,7 +15,7 @@
 
 #define COLORPARAMS unsigned char r, unsigned char g, unsigned char b, unsigned char a
 
-#define PI 3.1415926
+#define PI 3.14159265358979323846
 
 extern void canvas_clear();
 extern void canvas_clip(int x, int y, int w, int h);
@@ -214,7 +214,8 @@ const int NOUNIONEX_MIN_HEIGHT = 20;
 const int UNIT_HANDLE_ZONE_WIDTH = 16;
 const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 12;
 const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
-const int UNIT_REPEAT_WIRE_MARGIN = 5;
+const int UNIT_REPEAT_WIRE_MARGIN = 6;
+const int UNIT_REPEAT_WIRE_RADIUS = 10;
 const int UNIT_REPEAT_WIRE_SCOOT = 2;
 const int UNIT_CONTENTS_MIN_HEIGHT = 20;
 const int UNIT_CONTENTS_LITCHAR_WIDTH = 15;
@@ -973,14 +974,12 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 
 	int leftWireX = origin.x
 		+ unit->LeftHandleZoneWidth
-		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2
-		- WIRE_THICKNESS/2;
+		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2;
 	int rightWireX = origin.x
 		+ unit->LeftHandleZoneWidth
 		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH
 		+ unit->Contents.Size.x
-		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2
-		- WIRE_THICKNESS/2;
+		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2;
 
 	int scoot = (Unit_IsSkip(unit) && Unit_IsRepeat(unit) ? UNIT_REPEAT_WIRE_SCOOT : 0);
 
@@ -988,24 +987,57 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 		// draw the skip wire
 		int skipWireY = middleY
 			- unit->Contents.WireHeight
-			- UNIT_REPEAT_WIRE_MARGIN
-			- scoot
-			- WIRE_THICKNESS;
+			- UNIT_REPEAT_WIRE_MARGIN;
 
-		mu_draw_rect(
+		mu_draw_arc(
 			ctx,
-			mu_rect(leftWireX - scoot, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
-			COLOR_WIRE
+			leftWireX - UNIT_REPEAT_WIRE_RADIUS, middleY - UNIT_REPEAT_WIRE_RADIUS,
+			UNIT_REPEAT_WIRE_RADIUS,
+			-PI/2, 0,
+			COLOR_WIRE,
+			WIRE_THICKNESS
 		);
-		mu_draw_rect(
+		mu_draw_line(
 			ctx,
-			mu_rect(rightWireX + scoot, skipWireY, WIRE_THICKNESS, middleY - skipWireY),
-			COLOR_WIRE
+			leftWireX, middleY - UNIT_REPEAT_WIRE_RADIUS, leftWireX, skipWireY + UNIT_REPEAT_WIRE_RADIUS,
+			COLOR_WIRE,
+			WIRE_THICKNESS
 		);
-		mu_draw_rect(
+		mu_draw_arc(
 			ctx,
-			mu_rect(leftWireX - scoot, skipWireY, rightWireX - leftWireX + scoot*2 + WIRE_THICKNESS, WIRE_THICKNESS),
-			COLOR_WIRE
+			leftWireX + UNIT_REPEAT_WIRE_RADIUS, skipWireY + UNIT_REPEAT_WIRE_RADIUS,
+			UNIT_REPEAT_WIRE_RADIUS,
+			PI/2, PI,
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+		mu_draw_line(
+			ctx,
+			leftWireX + UNIT_REPEAT_WIRE_RADIUS, skipWireY, rightWireX - UNIT_REPEAT_WIRE_RADIUS, skipWireY,
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+		mu_draw_arc(
+			ctx,
+			rightWireX - UNIT_REPEAT_WIRE_RADIUS, skipWireY + UNIT_REPEAT_WIRE_RADIUS,
+			UNIT_REPEAT_WIRE_RADIUS,
+			0, PI/2,
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+		mu_draw_line(
+			ctx,
+			rightWireX, skipWireY + UNIT_REPEAT_WIRE_RADIUS, rightWireX, middleY - UNIT_REPEAT_WIRE_RADIUS,
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+		mu_draw_arc(
+			ctx,
+			rightWireX + UNIT_REPEAT_WIRE_RADIUS, middleY - UNIT_REPEAT_WIRE_RADIUS,
+			UNIT_REPEAT_WIRE_RADIUS,
+			PI, 3*PI/2,
+			COLOR_WIRE,
+			WIRE_THICKNESS
 		);
 	}
 
