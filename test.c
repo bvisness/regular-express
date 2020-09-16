@@ -212,11 +212,11 @@ const int UNION_VERTICAL_SPACING = 0;
 const int UNION_GUTTER_WIDTH = 16;
 const int NOUNIONEX_MIN_HEIGHT = 20;
 const int UNIT_HANDLE_ZONE_WIDTH = 16;
-const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 12;
+const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 24;
 const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
-const int UNIT_REPEAT_WIRE_MARGIN = 6;
+const int UNIT_REPEAT_WIRE_MARGIN = 12;
 const int UNIT_REPEAT_WIRE_RADIUS = 10;
-const int UNIT_REPEAT_WIRE_SCOOT = 2;
+const int UNIT_REPEAT_WIRE_SCOOT = 0;
 const int UNIT_CONTENTS_MIN_HEIGHT = 20;
 const int UNIT_CONTENTS_LITCHAR_WIDTH = 15;
 const int WIRE_THICKNESS = 2;
@@ -235,6 +235,118 @@ const mu_Color COLOR_SPECIAL_BACKGROUND = (mu_Color) { 170, 225, 170, 255 };
 const mu_Color COLOR_SELECTED_BACKGROUND = (mu_Color) { 122, 130, 255, 255 };
 
 const char* LEGAL_METACHARS = "dDwWsSbBnt";
+
+int getQuadrantXY(int dx, int dy) {
+	if (dx < 0) {
+		if (dy < 0) {
+			return 0;
+		} else {
+			return 3;
+		}
+	} else {
+		if (dy < 0) {
+			return 1;
+		} else {
+			return 2;
+		}
+	}
+}
+
+int getQuadrantYX(int dy, int dx) {
+	if (dy < 0) {
+		if (dx < 0) {
+			return 2;
+		} else {
+			return 3;
+		}
+	} else {
+		if (dx < 0) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+}
+
+void drawConnector(int startX, int startY, int inx, int dy1, int dx, int dy2, int outx) {
+	// TODO: Maybe change these to use mu_Vec2.
+	static float START_ANGLES[4] = {     PI, 3*PI/2,    0, PI/2 };
+	static float END_ANGLES[4] 	 = { 3*PI/2,      0, PI/2,   PI };
+
+	int dy1segments = inx == 0 ? 1 : 2;
+	int dy2segments = outx == 0 ? 1 : 2;
+
+	int q1 = getQuadrantXY(inx, dy1);
+	int r1 = imin(UNIT_REPEAT_WIRE_RADIUS, iabs(dy1/dy1segments));
+	int r1offsety = inx == 0 ? 0 : isign(dy1) * r1;
+
+	int q2 = getQuadrantYX(dy1, dx);
+	int r2 = imin(UNIT_REPEAT_WIRE_RADIUS, imin(iabs(dy1/dy1segments), iabs(dx/2)));
+
+	int q3 = getQuadrantXY(dx, dy2);
+	int r3 = imin(UNIT_REPEAT_WIRE_RADIUS, imin(iabs(dx/2), iabs(dy2)));
+
+	int q4 = getQuadrantYX(dy2, outx);
+	int r4 = imin(UNIT_REPEAT_WIRE_RADIUS, iabs(dy2/dy2segments));
+	int r4offsety = outx == 0 ? 0 : -isign(dy2) * r4;
+
+	if (inx != 0) {
+		mu_draw_arc(
+			ctx,
+			startX + -isign(inx) * r1, startY + isign(dy1) * r1,
+			r1,
+			START_ANGLES[q1], END_ANGLES[q1],
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+	}
+
+	mu_draw_line(
+		ctx,
+		startX, startY + r1offsety, startX, startY + (isign(dy1) * (iabs(dy1) - r2)),
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+	mu_draw_arc(
+		ctx,
+		startX + isign(dx) * r2, startY + dy1 + -isign(dy1) * r2,
+		r2,
+		START_ANGLES[q2], END_ANGLES[q2],
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+	mu_draw_line(
+		ctx,
+		startX + isign(dx) * r2, startY + dy1, startX + (isign(dx) * (iabs(dx) - r3)), startY + dy1,
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+	mu_draw_arc(
+		ctx,
+		startX + dx + -isign(dx) * r3, startY + dy1 + isign(dy2) * r3,
+		r3,
+		START_ANGLES[q3], END_ANGLES[q3],
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+	mu_draw_line(
+		ctx,
+		startX + dx, startY + dy1 + isign(dy2) * r3, startX + dx, startY + dy1 + dy2 + r4offsety,
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+
+	if (outx != 0) {
+		mu_draw_arc(
+			ctx,
+			startX + dx + isign(outx) * r4, startY + dy1 + dy2 + -isign(dy2) * r4,
+			r4,
+			START_ANGLES[q4], END_ANGLES[q4],
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+	}
+}
 
 void prepass_Regex(Regex* regex, NoUnionEx* parentEx);
 void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx);
@@ -985,84 +1097,31 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 
 	if (unit->RepeatMin < 1) {
 		// draw the skip wire
-		int skipWireY = middleY
-			- unit->Contents.WireHeight
-			- UNIT_REPEAT_WIRE_MARGIN;
+		int skipWireHeight = unit->Contents.WireHeight + UNIT_REPEAT_WIRE_MARGIN;
 
-		mu_draw_arc(
-			ctx,
-			leftWireX - UNIT_REPEAT_WIRE_RADIUS, middleY - UNIT_REPEAT_WIRE_RADIUS,
-			UNIT_REPEAT_WIRE_RADIUS,
-			-PI/2, 0,
-			COLOR_WIRE,
-			WIRE_THICKNESS
-		);
-		mu_draw_line(
-			ctx,
-			leftWireX, middleY - UNIT_REPEAT_WIRE_RADIUS, leftWireX, skipWireY + UNIT_REPEAT_WIRE_RADIUS,
-			COLOR_WIRE,
-			WIRE_THICKNESS
-		);
-		mu_draw_arc(
-			ctx,
-			leftWireX + UNIT_REPEAT_WIRE_RADIUS, skipWireY + UNIT_REPEAT_WIRE_RADIUS,
-			UNIT_REPEAT_WIRE_RADIUS,
-			PI/2, PI,
-			COLOR_WIRE,
-			WIRE_THICKNESS
-		);
-		mu_draw_line(
-			ctx,
-			leftWireX + UNIT_REPEAT_WIRE_RADIUS, skipWireY, rightWireX - UNIT_REPEAT_WIRE_RADIUS, skipWireY,
-			COLOR_WIRE,
-			WIRE_THICKNESS
-		);
-		mu_draw_arc(
-			ctx,
-			rightWireX - UNIT_REPEAT_WIRE_RADIUS, skipWireY + UNIT_REPEAT_WIRE_RADIUS,
-			UNIT_REPEAT_WIRE_RADIUS,
-			0, PI/2,
-			COLOR_WIRE,
-			WIRE_THICKNESS
-		);
-		mu_draw_line(
-			ctx,
-			rightWireX, skipWireY + UNIT_REPEAT_WIRE_RADIUS, rightWireX, middleY - UNIT_REPEAT_WIRE_RADIUS,
-			COLOR_WIRE,
-			WIRE_THICKNESS
-		);
-		mu_draw_arc(
-			ctx,
-			rightWireX + UNIT_REPEAT_WIRE_RADIUS, middleY - UNIT_REPEAT_WIRE_RADIUS,
-			UNIT_REPEAT_WIRE_RADIUS,
-			PI, 3*PI/2,
-			COLOR_WIRE,
-			WIRE_THICKNESS
+		drawConnector(
+			leftWireX, middleY,
+			10,
+			-skipWireHeight,
+			rightWireX - leftWireX,
+			skipWireHeight,
+			10
 		);
 	}
 
 	if (unit->RepeatMax != 1) {
 		// draw the repeat wire
-		int repeatWireY = middleY
+		int repeatWireHeight = unit->Contents.Size.y
 			- unit->Contents.WireHeight
-			+ unit->Contents.Size.y
-			+ UNIT_REPEAT_WIRE_MARGIN
-			- scoot;
+			+ UNIT_REPEAT_WIRE_MARGIN;
 
-		mu_draw_rect(
-			ctx,
-			mu_rect(leftWireX + scoot, middleY, WIRE_THICKNESS, repeatWireY - middleY),
-			COLOR_WIRE
-		);
-		mu_draw_rect(
-			ctx,
-			mu_rect(rightWireX - scoot, middleY, WIRE_THICKNESS, repeatWireY - middleY),
-			COLOR_WIRE
-		);
-		mu_draw_rect(
-			ctx,
-			mu_rect(leftWireX + scoot, repeatWireY, rightWireX - leftWireX - scoot*2 + WIRE_THICKNESS, WIRE_THICKNESS),
-			COLOR_WIRE
+		drawConnector(
+			rightWireX, middleY,
+			10,
+			repeatWireHeight,
+			leftWireX - rightWireX,
+			-repeatWireHeight,
+			10
 		);
 	}
 
@@ -1543,36 +1602,15 @@ int frame(float dt) {
 			if (drag.Type == DRAG_TYPE_WIRE) {
 				// draw preview
 				int offsetX = ctx->mouse_pos.x - drag.Wire.WireStartPos.x;
-				int previewY = drag.Wire.WireStartPos.y - iclamp(1/1.618f * offsetX, -40, 40);
-				mu_draw_rect(
-					ctx,
-					mu_rect(
-						imin(ctx->mouse_pos.x, drag.Wire.WireStartPos.x) - WIRE_THICKNESS/2,
-						previewY - WIRE_THICKNESS/2,
-						WIRE_THICKNESS/2 + iabs(offsetX) + WIRE_THICKNESS/2,
-						WIRE_THICKNESS
-					),
-					COLOR_WIRE
-				);
-				mu_draw_rect(
-					ctx,
-					mu_rect(
-						drag.Wire.WireStartPos.x - WIRE_THICKNESS/2,
-						imin(previewY, drag.Wire.WireStartPos.y) - WIRE_THICKNESS/2,
-						WIRE_THICKNESS,
-						WIRE_THICKNESS/2 + iabs(previewY - drag.Wire.WireStartPos.y) + WIRE_THICKNESS/2
-					),
-					COLOR_WIRE
-				);
-				mu_draw_rect(
-					ctx,
-					mu_rect(
-						ctx->mouse_pos.x - WIRE_THICKNESS/2,
-						imin(previewY, ctx->mouse_pos.y) - WIRE_THICKNESS/2,
-						WIRE_THICKNESS,
-						WIRE_THICKNESS/2 + iabs(previewY - ctx->mouse_pos.y) + WIRE_THICKNESS/2
-					),
-					COLOR_WIRE
+				int dy = -iclamp(1/1.618f * offsetX, -40, 40);
+
+				drawConnector(
+					drag.Wire.WireStartPos.x, drag.Wire.WireStartPos.y,
+					10,
+					dy,
+					offsetX,
+					ctx->mouse_pos.y - (drag.Wire.WireStartPos.y + dy),
+					0
 				);
 			} else if (drag.Type == DRAG_TYPE_BOX_SELECT) {
 				UnitRange newSelection = {0};
