@@ -209,7 +209,7 @@ void init() {
 }
 
 const int UNION_VERTICAL_SPACING = 0;
-const int UNION_GUTTER_WIDTH = 16;
+const int UNION_GUTTER_WIDTH = 30;
 const int NOUNIONEX_MIN_HEIGHT = 20;
 const int UNIT_HANDLE_ZONE_WIDTH = 16;
 const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 24;
@@ -268,11 +268,47 @@ int getQuadrantYX(int dy, int dx) {
 	}
 }
 
-void drawConnector(int startX, int startY, int inx, int dy1, int dx, int dy2, int outx) {
-	// TODO: Maybe change these to use mu_Vec2.
-	static float START_ANGLES[4] = {     PI, 3*PI/2,    0, PI/2 };
-	static float END_ANGLES[4] 	 = { 3*PI/2,      0, PI/2,   PI };
+// TODO: Maybe change these to use mu_Vec2.
+static float START_ANGLES[4] = {     PI, 3*PI/2,    0, PI/2 };
+static float END_ANGLES[4] 	 = { 3*PI/2,      0, PI/2,   PI };
 
+void drawVerticalConnector(int startX, int startY, int inx, int dy, int outx) {
+	int numArcs = (inx == 0 ? 0 : 1) + (outx == 0 ? 0 : 1);
+
+	int q1 = getQuadrantXY(inx, dy);
+	int q2 = getQuadrantYX(dy, outx);
+
+	int r = imin(UNIT_REPEAT_WIRE_RADIUS, iabs(dy/numArcs));
+
+	int r1offsety = inx == 0 ? 0 : isign(dy) * r;
+	int r2offsety = outx == 0 ? 0 : -isign(dy) * r;
+
+	mu_draw_arc(
+		ctx,
+		startX + -isign(inx) * r, startY + isign(dy) * r,
+		r,
+		START_ANGLES[q1], END_ANGLES[q1],
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+	mu_draw_line(
+		ctx,
+		startX, startY + r1offsety,
+		startX, startY + dy + r2offsety,
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+	mu_draw_arc(
+		ctx,
+		startX + isign(outx) * r, startY + dy + -isign(dy) * r,
+		r,
+		START_ANGLES[q2], END_ANGLES[q2],
+		COLOR_WIRE,
+		WIRE_THICKNESS
+	);
+}
+
+void drawConnector(int startX, int startY, int inx, int dy1, int dx, int dy2, int outx) {
 	int dy1segments = inx == 0 ? 1 : 2;
 	int dy2segments = outx == 0 ? 1 : 2;
 
@@ -396,7 +432,7 @@ void prepass_Regex(Regex* regex, NoUnionEx* parentEx) {
 	};
 	regex->Size = (Vec2i) {
 		.w = UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH,
-		.h = regex->UnionSize.h + 30,
+		.h = regex->UnionSize.h + 40,
 	};
 	regex->WireHeight = wireHeight;
 }
@@ -787,87 +823,72 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
 
 	// TODO: What if the union is empty?
 
-	int wireY = origin.y + regex->WireHeight - WIRE_THICKNESS/2;
+	int wireY = origin.y + regex->WireHeight;
 
 	// entry/exit wires (half gutter width)
-	mu_draw_rect(
+	mu_draw_line(
 		ctx,
-		mu_rect(
-			origin.x,
-			wireY,
-			UNION_GUTTER_WIDTH/2,
-			WIRE_THICKNESS
-		),
-		COLOR_WIRE
+		origin.x, wireY,
+		origin.x + UNION_GUTTER_WIDTH/2, wireY,
+		COLOR_WIRE,
+		WIRE_THICKNESS
 	);
-	mu_draw_rect(
+	mu_draw_line(
 		ctx,
-		mu_rect(
-			origin.x + UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH/2,
-			wireY,
-			UNION_GUTTER_WIDTH/2,
-			WIRE_THICKNESS
-		),
-		COLOR_WIRE
+		origin.x + regex->Size.x, wireY,
+		origin.x + regex->Size.x - UNION_GUTTER_WIDTH/2, wireY,
+		COLOR_WIRE,
+		WIRE_THICKNESS
 	);
 
 	int finalMemberWireY = wireY;
+
+	int leftConnectorX = origin.x + UNION_GUTTER_WIDTH/2;
+	int rightConnectorX = origin.x + UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH/2;
 
 	// union members
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx* member = regex->UnionMembers[i];
 		drawRailroad_NoUnionEx(member, memberOrigin, unitDepth);
 
-		int memberWireY = memberOrigin.y + member->WireHeight - WIRE_THICKNESS/2;
-		mu_draw_rect(
-			ctx,
-			mu_rect(
-				origin.x + UNION_GUTTER_WIDTH/2,
-				memberWireY,
-				UNION_GUTTER_WIDTH/2,
-				WIRE_THICKNESS
-			),
-			COLOR_WIRE
+		int memberWireY = memberOrigin.y + member->WireHeight;
+
+		drawVerticalConnector(
+			leftConnectorX, wireY, // TODO: Is wireY one pixel too high? (yes)
+			10,
+			memberWireY - wireY,
+			10
 		);
-		mu_draw_rect(
+
+		mu_draw_line(
 			ctx,
-			mu_rect(
-				origin.x + UNION_GUTTER_WIDTH + member->Size.w,
-				memberWireY,
-				regex->UnionSize.w - member->Size.w + UNION_GUTTER_WIDTH/2,
-				WIRE_THICKNESS
-			),
-			COLOR_WIRE
+			origin.x + UNION_GUTTER_WIDTH/2 + (i == 0 ? 0 : UNIT_REPEAT_WIRE_RADIUS), memberWireY,
+			origin.x + UNION_GUTTER_WIDTH, memberWireY,
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+		// TODO: The end x is the biggest wtf
+		mu_draw_line(
+			ctx,
+			origin.x + UNION_GUTTER_WIDTH + member->Size.w, memberWireY,
+			origin.x + regex->Size.w - UNION_GUTTER_WIDTH/2 - (i == 0 ? 0 : UNIT_REPEAT_WIRE_RADIUS), memberWireY,
+			COLOR_WIRE,
+			WIRE_THICKNESS
+		);
+
+		drawVerticalConnector(
+			rightConnectorX, wireY, // TODO: Is wireY one pixel too high? (yes)
+			-10,
+			memberWireY - wireY,
+			-10
 		);
 
 		finalMemberWireY = memberWireY;
 		memberOrigin.y += UNION_VERTICAL_SPACING + member->Size.h;
 	}
 
-	// vertical connecting wires
-	mu_draw_rect(
-		ctx,
-		mu_rect(
-			origin.x + UNION_GUTTER_WIDTH/2 - WIRE_THICKNESS/2,
-			wireY,
-			WIRE_THICKNESS,
-			finalMemberWireY - wireY + WIRE_THICKNESS
-		),
-		COLOR_WIRE
-	);
-	mu_draw_rect(
-		ctx,
-		mu_rect(
-			origin.x + UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH/2 - WIRE_THICKNESS/2,
-			wireY,
-			WIRE_THICKNESS,
-			finalMemberWireY - wireY + WIRE_THICKNESS
-		),
-		COLOR_WIRE
-	);
-
 	const int PLUS_BUTTON_WIDTH = 30;
-	mu_layout_set_next(ctx, mu_rect(origin.x + regex->Size.x/2 - PLUS_BUTTON_WIDTH/2, memberOrigin.y, PLUS_BUTTON_WIDTH, 20), 0);
+	mu_layout_set_next(ctx, mu_rect(origin.x + regex->Size.x/2 - PLUS_BUTTON_WIDTH/2, memberOrigin.y + 10, PLUS_BUTTON_WIDTH, 20), 0);
 	if (mu_button(ctx, "+")) {
 		NoUnionEx* newMember = NoUnionEx_init(RE_NEW(NoUnionEx));
 		Regex_AddUnionMember(regex, newMember, -1);
