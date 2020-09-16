@@ -208,10 +208,11 @@ void init() {
   	ctx->text_height = text_height;
 }
 
-const int UNION_VERTICAL_SPACING = 0;
+const int UNION_VERTICAL_SPACING = 4;
 const int UNION_GUTTER_WIDTH = 30;
 const int NOUNIONEX_MIN_HEIGHT = 20;
 const int UNIT_HANDLE_ZONE_WIDTH = 16;
+const int HANDLE_SIZE = 8;
 const int UNIT_WIRE_ATTACHMENT_ZONE_WIDTH = 24;
 const int UNIT_REPEAT_WIRE_ZONE_HEIGHT = 15;
 const int UNIT_REPEAT_WIRE_MARGIN = 12;
@@ -223,7 +224,7 @@ const int WIRE_THICKNESS = 2;
 const int SET_PADDING = 2;
 const int SET_HORIZONTAL_SPACING = 2;
 const int SET_DASH_WIDTH = 10;
-const int GROUP_VERTICAL_PADDING = 0;
+const int GROUP_VERTICAL_PADDING = 4;
 const int CURSOR_THICKNESS = 2;
 const int CURSOR_VERTICAL_PADDING = 2;
 
@@ -1054,7 +1055,6 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 		COLOR_WIRE
 	);
 
-	const int HANDLE_SIZE = 8;
 	int handleY = middleY - HANDLE_SIZE/2;
 
 	mu_Rect leftHandleRect;
@@ -1071,7 +1071,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 	if (shouldShowLeftHandle) {
 		int handleX = origin.x + unit->LeftHandleZoneWidth/2 - HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
-		mu_draw_rounded_rect(ctx, handleRect, COLOR_WIRE, 3);
+		mu_draw_rounded_rect(ctx, handleRect, COLOR_WIRE, 2);
 		leftHandleRect = handleRect;
 		overLeftHandle = mu_mouse_over(ctx, handleRect);
 	}
@@ -1085,7 +1085,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 			+ unit->RightHandleZoneWidth/2
 			- HANDLE_SIZE/2;
 		mu_Rect handleRect = mu_rect(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE);
-		mu_draw_rounded_rect(ctx, handleRect, COLOR_WIRE, 3);
+		mu_draw_rounded_rect(ctx, handleRect, COLOR_WIRE, 2);
 		rightHandleRect = handleRect;
 		overRightHandle = mu_mouse_over(ctx, handleRect);
 	}
@@ -1113,8 +1113,6 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
 		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH
 		+ unit->Contents.Size.x
 		+ UNIT_WIRE_ATTACHMENT_ZONE_WIDTH/2;
-
-	int scoot = (Unit_IsSkip(unit) && Unit_IsRepeat(unit) ? UNIT_REPEAT_WIRE_SCOOT : 0);
 
 	if (unit->RepeatMin < 1) {
 		// draw the skip wire
