@@ -4,15 +4,21 @@
 #include "../microui.h"
 
 typedef struct TextInputState {
-    int CursorPosition;
+    int InsertIndex; // The index where a new element will be inserted.
+
+    int CursorIndex; // The item the cursor will be rendered on.
+    int CursorRight; // If 1, draw the cursor on the right of the item.
+
     int SelectionBase;
 } TextInputState;
 
 extern const TextInputState DEFAULT_TEXT_INPUT_STATE;
 
-TextInputState TextState_SetCursorPosition(TextInputState state, int i, int select);
+TextInputState TextState_SetInsertIndex(TextInputState state, int i, int select);
 TextInputState TextState_MoveCursor(TextInputState state, int delta, int select);
 TextInputState TextState_BumpCursor(TextInputState state, int direction, int select);
+TextInputState TextState_SetCursorRight(TextInputState state, int cursorRight);
+TextInputState TextState_Clamp(TextInputState state, int minInsertIndex, int maxInsertIndex);
 
 int TextState_IsSelecting(TextInputState state);
 int TextState_SelectionStart(TextInputState state);

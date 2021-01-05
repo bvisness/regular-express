@@ -444,12 +444,11 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 	if (ctx->focus == muid) {
 		ctx->updated_focus = 1;
 
-		TextEditResult result = (TextEditResult) { .ResultState = ex->TextState };
 		int inputTextLength = strlen(ctx->input_text);
 
 		Unit* previousUnit = NULL;
-		if (ex->TextState.CursorPosition > 0) {
-			previousUnit = ex->Units[ex->TextState.CursorPosition - 1];
+		if (ex->TextState.InsertIndex > 0) {
+			previousUnit = ex->Units[ex->TextState.InsertIndex - 1];
 		}
 
 		if (ctx->key_pressed & MU_KEY_BACKSPACE
@@ -457,22 +456,28 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 				&& previousUnit
 				&& previousUnit->Contents.Type == RE_CONTENTS_METACHAR
 		) {
+			// break the previous metachar
+			ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+
 			char c = previousUnit->Contents.MetaChar.C;
+			int insertUnitsAt = ex->TextState.InsertIndex - 1;
 
 			Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
 			Unit_delete(deletedUnit);
-			ex->TextState.CursorPosition--;
 
 			Unit* backslash = Unit_initWithLiteralChar(RE_NEW(Unit), '\\');
-			NoUnionEx_AddUnit(ex, backslash, ex->TextState.CursorPosition);
-			ex->TextState.CursorPosition++;
+			NoUnionEx_AddUnit(ex, backslash, insertUnitsAt);
 
 			Unit* character = Unit_initWithLiteralChar(RE_NEW(Unit), c);
-			NoUnionEx_AddUnit(ex, character, ex->TextState.CursorPosition);
-			ex->TextState.CursorPosition++;
+			NoUnionEx_AddUnit(ex, character, insertUnitsAt + 1);
+
+			ex->TextState = TextState_SetCursorRight(
+				TextState_SetInsertIndex(ex->TextState, insertUnitsAt + 2, 0),
+				1
+			);
 		} else if (ctx->key_pressed & MU_KEY_BACKSPACE
 				&& !TextState_IsSelecting(ex->TextState)
-				&& ex->TextState.CursorPosition == 0
+				&& ex->TextState.InsertIndex == 0
 		) {
 			NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
 			int index = previousEx->NumUnits;
@@ -487,7 +492,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 				index
 			);
 			ctx->focus = mu_get_id_noidstack(ctx, &previousEx, sizeof(NoUnionEx*));
-			previousEx->TextState.CursorPosition = index;
+			previousEx->TextState.InsertIndex = index;
 		} else if (inputTextLength > 1) {
 			// assume we are pasting and want to parse a regex
 			// TODO: We should probably explicitly detect that we are pasting.
@@ -498,8 +503,8 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 				NoUnionEx* src = parseResult->UnionMembers[0];
 				while (src->NumUnits > 0) {
 					Unit* unit = NoUnionEx_RemoveUnit(src, 0);
-					NoUnionEx_AddUnit(ex, unit, ex->TextState.CursorPosition);
-					ex->TextState.CursorPosition++;
+					NoUnionEx_AddUnit(ex, unit, ex->TextState.InsertIndex);
+					ex->TextState = TextState_BumpCursor(ex->TextState, 1, 0);
 				}
 			} else {
 				// must create a group
@@ -507,109 +512,112 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
 				newUnit->Contents.Group->Regex = parseResult;
 
-				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.CursorPosition);
+				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.InsertIndex);
 			}
 
 			Regex_delete(parseResult);
 		} else {
-			result = StandardTextInput(ctx, ex->TextState, ex->NumUnits);
-		}
+			TextEditResult result = StandardTextInput(ctx, ex->TextState, ex->NumUnits);
 
-		if (result.DoDelete) {
-			result.DeleteMin = iclamp(result.DeleteMin, 0, ex->NumUnits);
-			result.DeleteMax = iclamp(result.DeleteMax, 0, ex->NumUnits);
+			if (result.DoDelete) {
+				result.DeleteMin = iclamp(result.DeleteMin, 0, ex->NumUnits);
+				result.DeleteMax = iclamp(result.DeleteMax, 0, ex->NumUnits);
 
-			for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
-				Unit* deleted = NoUnionEx_RemoveUnit(ex, result.DeleteMin);
-				Unit_delete(deleted);
-			}
-		}
-
-		ex->TextState = result.ResultState;
-
-		if (result.DoInput && inputTextLength == 1) {
-			Unit* newUnit = NULL;
-			if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '[') {
-				newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
-				mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '9') {
-				newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
-				mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '0') {
-				if (parentEx) {
-					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
+				for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
+					Unit* deleted = NoUnionEx_RemoveUnit(ex, result.DeleteMin);
+					Unit_delete(deleted);
 				}
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '6') {
-				// caret
-				newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-				newUnit->Contents.Special->Type = RE_SPECIAL_STRINGSTART;
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '4') {
-				// dollar sign
-				newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-				newUnit->Contents.Special->Type = RE_SPECIAL_STRINGEND;
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '.') {
-				newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-				newUnit->Contents.Special->Type = RE_SPECIAL_ANY;
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '/') {
-				// question mark
-				Unit_SetRepeatMin(previousUnit, 0);
-				Unit_SetRepeatMax(previousUnit, 1);
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '=') {
-				// plus
-				Unit_SetRepeatMin(previousUnit, 1);
-				Unit_SetRepeatMax(previousUnit, -1);
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '8') {
-				// asterisk
-				Unit_SetRepeatMin(previousUnit, 0);
-				Unit_SetRepeatMax(previousUnit, -1);
-			} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '\\') {
-				// pipe
-				NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
-				MoveUnitsTo(
-					(UnitRange) {
-						.Ex = ex,
-						.Start = ex->TextState.CursorPosition,
-						.End = ex->NumUnits - 1,
-					},
-					newEx,
-					0
-				);
-				Regex_AddUnionMember(regex, newEx, ex->Index + 1);
-
-				ctx->focus = mu_get_id_noidstack(ctx, &newEx, sizeof(NoUnionEx*));
-			} else if (previousUnit
-						&& previousUnit->Contents.Type == RE_CONTENTS_LITCHAR
-						&& previousUnit->Contents.LitChar.C == '\\'
-						&& strchr(LEGAL_METACHARS, ctx->input_text[0])
-			) {
-				// previous unit is a slash, do a metachar
-				Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
-				Unit_delete(deletedUnit);
-				ex->TextState.CursorPosition--;
-
-				newUnit = Unit_init(RE_NEW(Unit));
-				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
-				newUnit->Contents.MetaChar.C = ctx->input_text[0];
-			} else {
-				newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[0]);
 			}
 
-			if (newUnit) {
-				NoUnionEx_AddUnit(ex, newUnit, ex->TextState.CursorPosition);
-				ex->TextState.CursorPosition++;
-			}
+			ex->TextState = result.ResultState;
 
-			ctx->input_text[0] = 0;
+			if (result.DoInput && inputTextLength == 1) {
+				Unit* newUnit = NULL;
+				if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '[') {
+					newUnit = Unit_init(RE_NEW(Unit));
+					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
+					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '9') {
+					newUnit = Unit_init(RE_NEW(Unit));
+					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
+					mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '0') {
+					if (parentEx) {
+						mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
+					}
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '6') {
+					// caret
+					newUnit = Unit_init(RE_NEW(Unit));
+					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+					newUnit->Contents.Special->Type = RE_SPECIAL_STRINGSTART;
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '4') {
+					// dollar sign
+					newUnit = Unit_init(RE_NEW(Unit));
+					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+					newUnit->Contents.Special->Type = RE_SPECIAL_STRINGEND;
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '.') {
+					newUnit = Unit_init(RE_NEW(Unit));
+					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+					newUnit->Contents.Special->Type = RE_SPECIAL_ANY;
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '/') {
+					// question mark
+					Unit_SetRepeatMin(previousUnit, 0);
+					Unit_SetRepeatMax(previousUnit, 1);
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '=') {
+					// plus
+					Unit_SetRepeatMin(previousUnit, 1);
+					Unit_SetRepeatMax(previousUnit, -1);
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '8') {
+					// asterisk
+					Unit_SetRepeatMin(previousUnit, 0);
+					Unit_SetRepeatMax(previousUnit, -1);
+				} else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '\\') {
+					// pipe
+					NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
+					MoveUnitsTo(
+						(UnitRange) {
+							.Ex = ex,
+							.Start = ex->TextState.InsertIndex,
+							.End = ex->NumUnits - 1,
+						},
+						newEx,
+						0
+					);
+					Regex_AddUnionMember(regex, newEx, ex->Index + 1);
+
+					ctx->focus = mu_get_id_noidstack(ctx, &newEx, sizeof(NoUnionEx*));
+				} else if (previousUnit
+							&& previousUnit->Contents.Type == RE_CONTENTS_LITCHAR
+							&& previousUnit->Contents.LitChar.C == '\\'
+							&& strchr(LEGAL_METACHARS, ctx->input_text[0])
+				) {
+					// previous unit is a slash, do a metachar
+					Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
+					Unit_delete(deletedUnit);
+					ex->TextState = TextState_SetCursorRight(
+						TextState_SetInsertIndex(ex->TextState, ex->TextState.InsertIndex - 1, 0),
+						1
+					);
+
+					newUnit = Unit_init(RE_NEW(Unit));
+					UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+					newUnit->Contents.MetaChar.C = ctx->input_text[0];
+				} else {
+					newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), ctx->input_text[0]);
+				}
+
+				if (newUnit) {
+					NoUnionEx_AddUnit(ex, newUnit, ex->TextState.InsertIndex);
+					ex->TextState = TextState_MoveCursor(ex->TextState, 1, 0);
+				}
+
+				ctx->input_text[0] = 0;
+			}
 		}
-
-		// fix up cursor position
-		ex->TextState.CursorPosition = iclamp(ex->TextState.CursorPosition, 0, ex->NumUnits);
 	}
+
+	// fix up cursor position
+	ex->TextState = TextState_Clamp(ex->TextState, 0, ex->NumUnits);
 
 	// calculate sizes
 	int w = 0;
@@ -716,8 +724,8 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
 		// Handle keyboard input to set up for next frame
 		TextEditResult result = {0};
 		int inputTextLength = strlen(ctx->input_text);
-		SetItem* itemBeforeCursor = (set->TextState.CursorPosition > 0
-			? set->Items[set->TextState.CursorPosition - 1]
+		SetItem* itemBeforeCursor = (set->TextState.InsertIndex > 0
+			? set->Items[set->TextState.InsertIndex - 1]
 			: NULL
 		);
 
@@ -737,8 +745,8 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
 
 			SetItem* newItem = SetItem_init(RE_NEW(SetItem));
 			newItem->LitChar.C = '-';
-			Set_AddItem(set, newItem, set->TextState.CursorPosition);
-			set->TextState.CursorPosition++;
+			Set_AddItem(set, newItem, set->TextState.InsertIndex);
+			set->TextState = TextState_BumpCursor(set->TextState, 1, 0);
 		} else {
 			result = StandardTextInput(ctx, set->TextState, set->NumItems);
 		}
@@ -785,14 +793,14 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
 
 					SetItem* newItem = SetItem_init(RE_NEW(SetItem));
 					newItem->LitChar.C = ctx->input_text[i];
-					Set_AddItem(set, newItem, set->TextState.CursorPosition);
-					set->TextState.CursorPosition++;
+					Set_AddItem(set, newItem, set->TextState.InsertIndex);
+					set->TextState = TextState_BumpCursor(set->TextState, 1, 0);
 				} while (0);
 			}
 		}
 
 		// fix up cursor position
-		set->TextState.CursorPosition = iclamp(set->TextState.CursorPosition, 0, set->NumItems);
+		set->TextState.InsertIndex = iclamp(set->TextState.InsertIndex, 0, set->NumItems);
 	}
 }
 
@@ -911,7 +919,7 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 		mu_set_focus(ctx, muid);
 		ex->TextState = (TextInputState) {
 			.SelectionBase = drag.BoxSelect.Result.Start,
-			.CursorPosition = drag.BoxSelect.Result.End + 1,
+			.InsertIndex = drag.BoxSelect.Result.End + 1,
 		};
 		drag.BoxSelect.Result = (UnitRange) {0};
 	}
@@ -944,23 +952,16 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 	}
 
 	if (ex->ClickedUnitIndex != -1) {
-		ex->TextState = TextState_SetCursorPosition(ex->TextState, ex->ClickedUnitIndex, ctx->key_down & MU_KEY_SHIFT);
+		ex->TextState = TextState_SetInsertIndex(ex->TextState, ex->ClickedUnitIndex, ctx->key_down & MU_KEY_SHIFT);
+		// TODO: Detect a click on the right half and use TEXT_CURSOR_RIGHT
 	}
 
 	if (ctx->focus == muid) {
 		// draw cursor
-		Unit* cursorUnit;
-		int cursorRight = 0;
-		if (ex->TextState.CursorPosition >= ex->NumUnits) {
-			cursorUnit = ex->Units[ex->NumUnits - 1];
-			cursorRight = 1;
-		} else {
-			cursorUnit = ex->Units[ex->TextState.CursorPosition];
-		}
-
+		Unit* cursorUnit = ex->Units[ex->TextState.CursorIndex];
 		mu_Rect contentsRect = cursorUnit->Contents.LastRect;
 
-		if (cursorRight) {
+		if (ex->TextState.CursorRight) {
 			mu_draw_rect(
 				ctx,
 				mu_rect(
@@ -1523,7 +1524,8 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 		if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, itemRect)) {
 			ctx->mouse_released &= ~MU_MOUSE_LEFT;
 			mu_set_focus(ctx, muid);
-			set->TextState = TextState_SetCursorPosition(set->TextState, i, 0); // TODO: Selection
+			set->TextState = TextState_SetInsertIndex(set->TextState, i, 0); // TODO: Selection
+			// TODO: right cursor?
 		}
 	}
 
@@ -1531,18 +1533,10 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 		ctx->updated_focus = 1;
 
 		// Draw cursor according to what we have _now_
-		SetItem* cursorItem;
-		int cursorRight = 0;
-		if (set->TextState.CursorPosition >= set->NumItems) {
-			cursorItem = set->Items[set->NumItems - 1];
-			cursorRight = 1;
-		} else {
-			cursorItem = set->Items[set->TextState.CursorPosition];
-		}
-
+		SetItem* cursorItem = set->Items[set->TextState.CursorIndex];
 		mu_Rect itemRect = cursorItem->LastRect;
 
-		if (cursorRight) {
+		if (set->TextState.CursorRight) {
 			mu_draw_rect(
 				ctx,
 				mu_rect(
@@ -1722,6 +1716,7 @@ int frame(float dt) {
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
 		if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
 			MoveAllUnitsTo(drag.MoveUnits.OriginEx, drag.MoveUnits.OriginIndex);
+
 		} else if (drag.Type == DRAG_TYPE_CREATE_UNION) {
 			UnitRange units = drag.CreateUnion.Units;
 

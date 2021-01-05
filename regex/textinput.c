@@ -5,14 +5,18 @@
 #include <stdio.h>
 
 const TextInputState DEFAULT_TEXT_INPUT_STATE = (TextInputState) {
-    .CursorPosition = 0,
+    .InsertIndex = 0,
+    .CursorIndex = 0,
+    .CursorRight = 0,
     .SelectionBase = -1,
 };
 
 TextInputState fixupState(TextInputState state) {
-    if (state.CursorPosition == state.SelectionBase) {
+    if (state.InsertIndex == state.SelectionBase) {
         return (TextInputState) {
-            .CursorPosition = state.CursorPosition,
+            .InsertIndex = state.InsertIndex,
+            .CursorIndex = state.CursorIndex,
+            .CursorRight = state.CursorRight,
             .SelectionBase = -1,
         };
     }
@@ -20,38 +24,84 @@ TextInputState fixupState(TextInputState state) {
     return state;
 }
 
-TextInputState TextState_SetCursorPosition(TextInputState state, int i, int select) {
+TextInputState TextState_SetInsertIndex(TextInputState state, int i, int select) {
     TextInputState result;
 
     if (select) {
         result = (TextInputState) {
-            .CursorPosition = i,
-            .SelectionBase = (state.SelectionBase == -1 ? state.CursorPosition : state.SelectionBase),
+            .InsertIndex = i,
+            .SelectionBase = (state.SelectionBase == -1 ? state.InsertIndex : state.SelectionBase),
         };
     } else {
         result = (TextInputState) {
-            .CursorPosition = i,
+            .InsertIndex = i,
             .SelectionBase = -1,
         };
     }
+
+    result.CursorIndex = i;
+    result.CursorRight = 0;
 
     return fixupState(result);
 }
 
 TextInputState TextState_MoveCursor(TextInputState state, int delta, int select) {
-    return TextState_SetCursorPosition(state, state.CursorPosition + delta, select);
+    TextInputState result = TextState_SetInsertIndex(state, state.InsertIndex + delta, select);
+
+    int cursorRight = delta > 0;
+    if (result.SelectionBase != -1) {
+        cursorRight = result.InsertIndex > result.SelectionBase;
+    }
+    result = TextState_SetCursorRight(result, cursorRight);
+
+    return result;
 }
 
 TextInputState TextState_BumpCursor(TextInputState state, int direction, int select) {
     if (!select && state.SelectionBase != -1) {
         int destination = (direction > 0
-            ? imax(state.CursorPosition, state.SelectionBase)
-            : imin(state.CursorPosition, state.SelectionBase)
+            ? imax(state.InsertIndex, state.SelectionBase)
+            : imin(state.InsertIndex, state.SelectionBase)
         );
-        return TextState_SetCursorPosition(state, destination, 0);
+        return TextState_SetCursorRight(
+            TextState_SetInsertIndex(state, destination, 0),
+            direction > 0
+        );
     }
 
     return TextState_MoveCursor(state, (direction > 0 ? 1 : -1), select);
+}
+
+TextInputState TextState_SetCursorRight(TextInputState state, int cursorRight) {
+    TextInputState result = state;
+
+    if (cursorRight) {
+        result.CursorIndex = state.InsertIndex - 1;
+        result.CursorRight = 1;
+    } else {
+        result.CursorIndex = state.InsertIndex;
+        result.CursorRight = 0;
+    }
+
+    return result;
+}
+
+TextInputState TextState_Clamp(TextInputState state, int minInsertIndex, int maxInsertIndex) {
+    TextInputState result = state;
+
+    result.InsertIndex = iclamp(result.InsertIndex, minInsertIndex, maxInsertIndex);
+
+    if (result.CursorIndex < minInsertIndex) {
+        result.CursorIndex = minInsertIndex;
+        result.CursorRight = 0;
+    }
+
+    if (result.CursorIndex >= maxInsertIndex) {
+        result.CursorIndex = maxInsertIndex - 1;
+        result.CursorRight = 1;
+    }
+
+    return result;
 }
 
 int TextState_IsSelecting(TextInputState state) {
@@ -59,11 +109,11 @@ int TextState_IsSelecting(TextInputState state) {
 }
 
 int TextState_SelectionStart(TextInputState state) {
-    return imin(state.CursorPosition, state.SelectionBase);
+    return imin(state.InsertIndex, state.SelectionBase);
 }
 
 int TextState_SelectionEnd(TextInputState state) {
-    return imax(state.CursorPosition, state.SelectionBase) - 1;
+    return imax(state.InsertIndex, state.SelectionBase) - 1;
 }
 
 int TextState_IsSelected(TextInputState state, int index) {
@@ -71,8 +121,8 @@ int TextState_IsSelected(TextInputState state, int index) {
         return 0;
     }
 
-    int min = imin(state.CursorPosition, state.SelectionBase);
-    int max = imax(state.CursorPosition, state.SelectionBase);
+    int min = imin(state.InsertIndex, state.SelectionBase);
+    int max = imax(state.InsertIndex, state.SelectionBase);
     return min <= index && index < max;
 }
 
@@ -82,22 +132,25 @@ TextEditResult TextState_DeleteBackwards(TextInputState state) {
     result.DoDelete = 1;
 
     if (state.SelectionBase != -1) {
-        result.DeleteMin = imin(state.CursorPosition, state.SelectionBase);
-        result.DeleteMax = imax(state.CursorPosition, state.SelectionBase);
+        result.DeleteMin = imin(state.InsertIndex, state.SelectionBase);
+        result.DeleteMax = imax(state.InsertIndex, state.SelectionBase);
 
         result.ResultState = (TextInputState) {
-            .CursorPosition = imin(state.CursorPosition, state.SelectionBase),
+            .InsertIndex = imin(state.InsertIndex, state.SelectionBase),
             .SelectionBase = -1,
         };
     } else {
-        result.DeleteMin = state.CursorPosition - 1;
-        result.DeleteMax = state.CursorPosition;
+        result.DeleteMin = state.InsertIndex - 1;
+        result.DeleteMax = state.InsertIndex;
 
         result.ResultState = (TextInputState) {
-            .CursorPosition = state.CursorPosition - 1,
+            .InsertIndex = state.InsertIndex - 1,
             .SelectionBase = -1,
         };
     }
+
+    result.ResultState.CursorRight = 1;
+    result.ResultState.CursorIndex = result.ResultState.InsertIndex - 1;
 
     return result;
 }
@@ -108,22 +161,25 @@ TextEditResult TextState_DeleteForwards(TextInputState state) {
     result.DoDelete = 1;
 
     if (state.SelectionBase != -1) {
-        result.DeleteMin = imin(state.CursorPosition, state.SelectionBase);
-        result.DeleteMax = imax(state.CursorPosition, state.SelectionBase);
+        result.DeleteMin = imin(state.InsertIndex, state.SelectionBase);
+        result.DeleteMax = imax(state.InsertIndex, state.SelectionBase);
 
         result.ResultState = (TextInputState) {
-            .CursorPosition = imin(state.CursorPosition, state.SelectionBase),
+            .InsertIndex = imin(state.InsertIndex, state.SelectionBase),
             .SelectionBase = -1,
         };
     } else {
-        result.DeleteMin = state.CursorPosition;
-        result.DeleteMax = state.CursorPosition + 1;
+        result.DeleteMin = state.InsertIndex;
+        result.DeleteMax = state.InsertIndex + 1;
 
         result.ResultState = (TextInputState) {
-            .CursorPosition = state.CursorPosition,
+            .InsertIndex = state.InsertIndex,
             .SelectionBase = -1,
         };
     }
+
+    result.ResultState.CursorRight = 0;
+    result.ResultState.CursorIndex = result.ResultState.InsertIndex;
 
     return result;
 }
@@ -131,19 +187,19 @@ TextEditResult TextState_DeleteForwards(TextInputState state) {
 TextEditResult TextState_InsertString(TextInputState state) {
     TextEditResult result = {0};
 
-    int insertAt = state.CursorPosition;
+    int insertAt = state.InsertIndex;
 
     if (state.SelectionBase != -1) {
         result.DoDelete = 1;
-        result.DeleteMin = imin(state.CursorPosition, state.SelectionBase);
-        result.DeleteMax = imax(state.CursorPosition, state.SelectionBase);
+        result.DeleteMin = imin(state.InsertIndex, state.SelectionBase);
+        result.DeleteMax = imax(state.InsertIndex, state.SelectionBase);
 
         insertAt = result.DeleteMin;
     }
 
     result.DoInput = 1;
     result.ResultState = (TextInputState) {
-        .CursorPosition = insertAt,
+        .InsertIndex = insertAt,
         .SelectionBase = -1,
     };
 
@@ -153,35 +209,48 @@ TextEditResult TextState_InsertString(TextInputState state) {
 TextEditResult StandardTextInput(mu_Context* ctx, TextInputState textState, int maxIndex) {
     int doSelection = ctx->key_down & MU_KEY_SHIFT;
 
+    TextEditResult result;
+
     if (ctx->key_pressed & MU_KEY_ARROWLEFT) {
         ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
-        return (TextEditResult) { .ResultState = TextState_BumpCursor(textState, -1, doSelection) };
+        result = (TextEditResult) { .ResultState = TextState_BumpCursor(textState, -1, doSelection) };
     } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT) {
         ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-        return (TextEditResult) { .ResultState = TextState_BumpCursor(textState, 1, doSelection) };
+        result = (TextEditResult) { .ResultState = TextState_BumpCursor(textState, 1, doSelection) };
     } else if (ctx->key_pressed & MU_KEY_HOME) {
         ctx->key_pressed &= ~MU_KEY_HOME;
-        return (TextEditResult) { .ResultState = TextState_SetCursorPosition(textState, 0, doSelection) };
+        result = (TextEditResult) { .ResultState = TextState_SetInsertIndex(textState, 0, doSelection) };
     } else if (ctx->key_pressed & MU_KEY_END) {
         ctx->key_pressed &= ~MU_KEY_END;
-        return (TextEditResult) { .ResultState = TextState_SetCursorPosition(textState, maxIndex, doSelection) };
+        result = (TextEditResult) {
+            .ResultState = TextState_SetCursorRight(
+                TextState_SetInsertIndex(textState, maxIndex, doSelection),
+                1
+            ),
+        };
     } else if (ctx->key_pressed & MU_KEY_BACKSPACE) {
         ctx->key_pressed &= ~MU_KEY_BACKSPACE;
-        return TextState_DeleteBackwards(textState);
+        result = TextState_DeleteBackwards(textState);
     } else if (ctx->key_pressed & MU_KEY_DELETE) {
         ctx->key_pressed &= ~MU_KEY_DELETE;
-        return TextState_DeleteForwards(textState);
+        result = TextState_DeleteForwards(textState);
     } else if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == 'a') {
         ctx->input_text[0] = 0;
-        return (TextEditResult) {
+        result = (TextEditResult) {
             .ResultState = (TextInputState) {
-                .CursorPosition = maxIndex,
+                .InsertIndex = maxIndex,
                 .SelectionBase = 0,
             },
         };
     } else if (ctx->input_text[0] != 0) {
-        return TextState_InsertString(textState);
+        result = TextState_InsertString(textState);
     } else {
-        return (TextEditResult) { .ResultState = textState };
+        result = (TextEditResult) { .ResultState = textState };
     }
+
+    // Since this is standard text input, we can assume the bounds
+    // are from 0 to max index and correct accordingly.
+    result.ResultState = TextState_Clamp(result.ResultState, 0, maxIndex);
+
+    return result;
 }
