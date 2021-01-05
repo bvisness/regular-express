@@ -1600,9 +1600,9 @@ void printPools() {
 int frame(float dt) {
 	mu_begin(ctx, dt);
 
-	const int PAGE_WIDTH = 800;
+	const int PAGE_WIDTH = 900;
 	const int WINDOW_PADDING = 10;
-	const int GUI_HEIGHT = 500;
+	const int GUI_HEIGHT = 400;
 
 	prepass_Regex(regex, NULL);
 	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL);

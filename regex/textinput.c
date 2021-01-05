@@ -141,6 +141,7 @@ TextEditResult TextState_InsertString(TextInputState state) {
         insertAt = result.DeleteMin;
     }
 
+    result.DoInput = 1;
     result.ResultState = (TextInputState) {
         .CursorPosition = insertAt,
         .SelectionBase = -1,
@@ -178,7 +179,9 @@ TextEditResult StandardTextInput(mu_Context* ctx, TextInputState textState, int 
                 .SelectionBase = 0,
             },
         };
+    } else if (ctx->input_text[0] != 0) {
+        return TextState_InsertString(textState);
     } else {
-        return (TextEditResult) { .DoInput = 1, .ResultState = textState };
+        return (TextEditResult) { .ResultState = textState };
     }
 }
