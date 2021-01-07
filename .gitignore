@@ -2,4 +2,4 @@
 *.o
 *.wasm
 *.sublime-workspace
-test.wat
+build/*
