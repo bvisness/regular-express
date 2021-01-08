@@ -1,5 +1,4 @@
-#ifndef REGEX_INTERP_H
-#define REGEX_INTERP_H
+#pragma once
 
 #include "../microui.h"
 
@@ -92,5 +91,3 @@ static inline int rect_overlaps(mu_Rect r1, mu_Rect r2) {
     mu_Rect intersection = rect_intersect(r1, r2);
     return (intersection.w && intersection.h);
 }
-
-#endif

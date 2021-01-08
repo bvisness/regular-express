@@ -80,4 +80,41 @@
 
 		get_local $dst
 	)
+	(func (export "memchr")
+		(param $ptr i32) (param $value i32) (param $num i32)
+		(result i32)
+
+		(local $currentPtr i32)
+
+		get_local $ptr
+		set_local $currentPtr
+
+		loop
+			;; check if pointing at occurrence of value
+			get_local $currentPtr
+			i32.load8_u
+			get_local $value
+			i32.eq
+			if
+				get_local $currentPtr
+				return
+			end
+
+			;; increment currentPtr
+			get_local $currentPtr
+			i32.const 1
+			i32.add
+			set_local $currentPtr
+
+			;; decrement num
+			get_local $num
+			i32.const 1
+			i32.sub
+			tee_local $num
+
+			br_if 0
+		end
+
+		i32.const 0
+	)
 )

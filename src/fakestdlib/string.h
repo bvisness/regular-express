@@ -1,5 +1,4 @@
-#ifndef FAKESTDLIB_STRING_H
-#define FAKESTDLIB_STRING_H
+#pragma once
 
 #include <stdlib.h>
 
@@ -8,5 +7,3 @@ extern void* memcpy(void *dest, const void * src, size_t n);
 
 unsigned long strlen(const char* str);
 char* strchr(const char* str, int ch);
-
-#endif

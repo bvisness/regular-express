@@ -1,5 +1,4 @@
-#ifndef FAKESTDLIB_STDLIB_H
-#define FAKESTDLIB_STDLIB_H
+#pragma once
 
 #include <stddef.h>
 #include <debug.h>
@@ -13,6 +12,4 @@ void qsort(void* base, size_t nitems, size_t size, int (*compar)(const void *, c
 #define assert(condition) ((void)0)
 #else
 #define assert(condition) if (!(condition)) { printError(#condition); abort(); }
-#endif
-
 #endif

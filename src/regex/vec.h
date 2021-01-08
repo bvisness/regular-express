@@ -1,5 +1,4 @@
-#ifndef VEC_H
-#define VEC_H
+#pragma once
 
 typedef struct Vec2i {
     union {
@@ -11,5 +10,3 @@ typedef struct Vec2i {
         int h;
     };
 } Vec2i;
-
-#endif

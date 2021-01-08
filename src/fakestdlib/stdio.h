@@ -1,8 +1,6 @@
-#ifndef FAKESTDLIB_STDIO_H
-#define FAKESTDLIB_STDIO_H
+#pragma once
 
 #include <stb_sprintf.h>
-
 #include <debug.h>
 
 #define stdout 0
@@ -12,5 +10,3 @@
 int printf(const char* format, ...);
 int fprintf(int nope, const char* format, ...);
 double strtod(const char* str, char** endptr);
-
-#endif

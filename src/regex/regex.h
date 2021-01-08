@@ -1,5 +1,4 @@
-#ifndef REGEX_H
-#define REGEX_H
+#pragma once
 
 #include <string.h>
 #include <stdio.h>
@@ -175,5 +174,3 @@ typedef struct Special {
 const char* Special_GetHumanString(Special* s);
 
 char* ToString(Regex* regex);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef TEXTINPUT_H
-#define TEXTINPUT_H
+#pragma once
 
 #include "../microui.h"
 
@@ -46,5 +45,3 @@ TextEditResult TextState_DeleteForwards(TextInputState state);
 TextEditResult TextState_InsertString(TextInputState state);
 
 TextEditResult StandardTextInput(mu_Context* ctx, TextInputState textState, int maxIndex);
-
-#endif

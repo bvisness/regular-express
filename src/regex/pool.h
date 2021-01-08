@@ -1,5 +1,4 @@
-#ifndef POOL_H
-#define POOL_H
+#pragma once
 
 #include <stddef.h>
 
@@ -39,5 +38,3 @@ void pool_free(Pool *p, void *ptr);
 void pool_free_all(Pool *p);
 
 #define POOL_INIT(type, poolPtr) pool_init(poolPtr, #type, malloc(sizeof(type) * POOL_SIZE), sizeof(type) * POOL_SIZE, sizeof(type))
-
-#endif

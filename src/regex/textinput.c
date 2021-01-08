@@ -1,6 +1,6 @@
 #include "textinput.h"
 
-#include "../util/util.h"
+#include "../util/math.h"
 
 #include <stdio.h>
 

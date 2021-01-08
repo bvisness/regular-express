@@ -1,5 +1,4 @@
-#ifndef REGEX_ALLOC_H
-#define REGEX_ALLOC_H
+#pragma once
 
 #include "pool.h"
 #include "regex.h"
@@ -43,5 +42,3 @@ void Special_delete(Special* special);
 void Set_delete(Set* set);
 void SetItem_delete(SetItem* item);
 void Group_delete(Group* group);
-
-#endif
