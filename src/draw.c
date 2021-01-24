@@ -782,9 +782,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
         case RE_CONTENTS_SPECIAL: {
             mu_draw_rect(ctx, r, selected ? backgroundColor : COLOR_SPECIAL_BACKGROUND);
 
-            Special* s = contents->Special;
-
-            const char* str = Special_GetHumanString(s);
+            const char* str = Special_GetHumanString(&contents->Special);
             mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
             draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
         } break;

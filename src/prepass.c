@@ -157,16 +157,16 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                     // caret
                     newUnit = Unit_init(RE_NEW(Unit));
                     UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-                    newUnit->Contents.Special->Type = RE_SPECIAL_STRINGSTART;
+                    newUnit->Contents.Special.Type = RE_SPECIAL_STRINGSTART;
                 } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '4') {
                     // dollar sign
                     newUnit = Unit_init(RE_NEW(Unit));
                     UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-                    newUnit->Contents.Special->Type = RE_SPECIAL_STRINGEND;
+                    newUnit->Contents.Special.Type = RE_SPECIAL_STRINGEND;
                 } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '.') {
                     newUnit = Unit_init(RE_NEW(Unit));
                     UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-                    newUnit->Contents.Special->Type = RE_SPECIAL_ANY;
+                    newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
                 } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '/') {
                     // question mark
                     Unit_SetRepeatMin(previousUnit, 0);
@@ -280,7 +280,7 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex) {
             contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
         } break;
         case RE_CONTENTS_SPECIAL: {
-            const char* str = Special_GetHumanString(contents->Special);
+            const char* str = Special_GetHumanString(&contents->Special);
             int width = measureText(str, strlen(str));
 
             contents->Size = (Vec2i) { .w = width + 20, .h = UNIT_CONTENTS_MIN_HEIGHT };

@@ -50,8 +50,12 @@
 
 		async function init() {
 			const mem = new WebAssembly.Memory({
-				initial: 100,
+				initial: 256,
 			});
+			const memBuf = new Uint8Array(mem.buffer);
+			for (let i = 0; i < 1024; i++) {
+				memBuf[i] = 0b10101010;
+			}
 
 			window.mem = mem;
 
@@ -288,7 +292,8 @@
 					specialKeyEvent('down', e);
 				} else if (
 					!e.ctrlKey
-					|| 'a'.indexOf(e.key) > -1
+					|| e.code == 'KeyA'
+					|| e.code == 'KeyZ'
 				) {
 					putString(test.exports.textInputBuf, e.key);
 					test.exports.textInput();
@@ -348,6 +353,13 @@
 			// by a lot.
 			let lastTime = new Date().getTime() / 1000;
 			function doFrame() {
+				const memBuf = new Uint8Array(mem.buffer);
+				for (let i = 0; i < 1024; i++) {
+					if (memBuf[i] != 0b10101010) {
+						console.error("WRITE TO PROTECTED MEMORY!", { index: i });
+					}
+				}
+
 				const currentTime = new Date().getTime() / 1000;
 				const animating = test.exports.frame(currentTime - lastTime);
 

@@ -9,6 +9,7 @@
 #include "draw.h"
 #include "globals.h"
 #include "prepass.h"
+#include "undo.h"
 
 #include "regex/alloc.h"
 #include "regex/parser.h"
@@ -78,17 +79,8 @@ void init() {
 	mu_init(ctx);
 	ctx->text_width = text_width;
   	ctx->text_height = text_height;
-}
 
-void printPools() {
-	RE_PRINT_POOL(Regex);
-	RE_PRINT_POOL(NoUnionEx);
-	RE_PRINT_POOL(Unit);
-	RE_PRINT_POOL(MetaChar);
-	RE_PRINT_POOL(Special);
-	RE_PRINT_POOL(Set);
-	RE_PRINT_POOL(SetItem);
-	RE_PRINT_POOL(Group);
+  	Undo_Reset();
 }
 
 int frame(float dt) {
@@ -97,6 +89,23 @@ int frame(float dt) {
 	const int PAGE_WIDTH = 900;
 	const int WINDOW_PADDING = 10;
 	const int GUI_HEIGHT = 400;
+
+	if (
+		ctx->key_down & MU_KEY_CTRL
+		&& ctx->key_down & MU_KEY_SHIFT
+		&& ctx->input_text[0] == 'Z' // TODO: It is so awkward to have to deal with keys being capitalized when shift is pressed.
+	) {
+		ctx->input_text[0] = 0;
+		Undo_Redo();
+	} else if (
+		ctx->key_down & MU_KEY_CTRL
+		&& ctx->input_text[0] == 'z'
+	) {
+		ctx->input_text[0] = 0;
+		Undo_Undo();
+	}
+
+	Regex_PushUndo(regex);
 
 	prepass_Regex(regex, NULL);
 	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL);
@@ -232,6 +241,8 @@ int frame(float dt) {
 	}
 
 	mu_end(ctx);
+
+	Undo_Commit();
 
 	canvas_clear();
 	mu_Command *cmd = NULL;

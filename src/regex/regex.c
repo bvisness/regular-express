@@ -1,6 +1,9 @@
 #include "regex.h"
+#include "../undo.h"
 
 const char* SPECIAL_CHARACTERS = "()[]{}*+?.\\|^$";
+
+#define UNDOPUSH(expr) Undo_Push(&expr, sizeof(expr), #expr);
 
 void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex, int index) {
     assert(regex->NumUnionMembers < MAX_UNION_MEMBERS);
@@ -44,6 +47,17 @@ NoUnionEx* Regex_RemoveUnionMember(Regex* regex, int index) {
     }
 
     return ex;
+}
+
+void Regex_PushUndo(Regex* regex) {
+    if (!regex) return;
+
+    UNDOPUSH(regex->NumUnionMembers);
+    UNDOPUSH(regex->UnionMembers);
+
+    for (int i = 0; i < regex->NumUnionMembers; i++) {
+        NoUnionEx_PushUndo(regex->UnionMembers[i]);
+    }
 }
 
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {
@@ -107,6 +121,30 @@ void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit
 
     // TODO: We can't return all the units that got replaced! What if we need
     // to free them?
+}
+
+void NoUnionEx_PushUndo(NoUnionEx* ex) {
+    if (!ex) return;
+
+    UNDOPUSH(ex->NumUnits);
+    UNDOPUSH(ex->Units);
+    UNDOPUSH(ex->Index);
+    UNDOPUSH(ex->TextState);
+
+    for (int i = 0; i < ex->NumUnits; i++) {
+        Unit_PushUndo(ex->Units[i]);
+    }
+}
+
+void UnitContents_PushUndo(UnitContents* contents) {
+    if (!contents) return;
+
+    UNDOPUSH(contents->Type);
+    UNDOPUSH(contents->LitChar);
+    UNDOPUSH(contents->MetaChar);
+    UNDOPUSH(contents->Special);
+    Set_PushUndo(contents->Set);
+    Group_PushUndo(contents->Group);
 }
 
 Unit* Unit_Previous(Unit* unit) {
@@ -190,6 +228,23 @@ int Unit_ShouldShowRightHandle(Unit* unit) {
     return 0;
 }
 
+void Unit_PushUndo(Unit* unit) {
+    if (!unit) return;
+
+    UnitContents_PushUndo(&unit->Contents);
+
+    UNDOPUSH(unit->RepeatMin);
+    UNDOPUSH(unit->RepeatMax);
+    UNDOPUSH(unit->Parent);
+    UNDOPUSH(unit->Index);
+}
+
+void Group_PushUndo(Group* group) {
+    if (!group) return;
+
+    Regex_PushUndo(group->Regex);
+}
+
 void Set_AddItem(Set* set, struct SetItem* item, int index) {
     assert(set->NumItems < MAX_SET_ITEMS);
 
@@ -226,6 +281,27 @@ struct SetItem* Set_RemoveItem(Set* set, int index) {
     }
 
     return item;
+}
+
+void Set_PushUndo(Set* set) {
+    if (!set) return;
+
+    UNDOPUSH(set->NumItems);
+    UNDOPUSH(set->Items);
+    UNDOPUSH(set->IsNegative);
+    UNDOPUSH(set->TextState);
+
+    for (int i = 0; i < set->NumItems; i++) {
+        SetItem_PushUndo(set->Items[i]);
+    }
+}
+
+void SetItem_PushUndo(SetItem* item) {
+    if (!item) return;
+
+    UNDOPUSH(item->Type);
+    UNDOPUSH(item->LitChar);
+    UNDOPUSH(item->Range);
 }
 
 const char* Special_GetHumanString(Special* s) {
@@ -366,7 +442,7 @@ char* toString_UnitContents(char* base, UnitContents* contents) {
             base = toString_Set(base, contents->Set);
         } break;
         case RE_CONTENTS_SPECIAL: {
-            base = toString_Special(base, contents->Special);
+            base = toString_Special(base, &contents->Special);
         } break;
         case RE_CONTENTS_LITCHAR: {
             base = toString_LitChar(base, &contents->LitChar);

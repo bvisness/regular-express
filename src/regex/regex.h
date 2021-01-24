@@ -46,6 +46,7 @@ struct Regex {
 
 void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex, int index);
 struct NoUnionEx* Regex_RemoveUnionMember(Regex* regex, int index);
+void Regex_PushUndo(Regex* regex);
 
 typedef struct NoUnionEx {
     int NumUnits;
@@ -61,6 +62,7 @@ typedef struct NoUnionEx {
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index);
 struct Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index);
 void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit);
+void NoUnionEx_PushUndo(NoUnionEx* ex);
 
 typedef struct LitChar {
     union {
@@ -77,12 +79,18 @@ typedef struct MetaChar {
     };
 } MetaChar;
 
+typedef struct Special {
+    int Type;
+} Special;
+
+const char* Special_GetHumanString(Special* s);
+
 typedef struct UnitContents {
     int Type;
 
     struct LitChar LitChar;
     struct MetaChar MetaChar;
-    struct Special* Special;
+    struct Special Special;
     struct Set* Set;
     struct Group* Group;
 
@@ -90,6 +98,8 @@ typedef struct UnitContents {
     int WireHeight;
     mu_Rect LastRect;
 } UnitContents;
+
+void UnitContents_PushUndo(UnitContents* contents);
 
 typedef struct Unit {
     struct UnitContents Contents;
@@ -130,6 +140,7 @@ int Unit_IsSkip(Unit* unit);
 int Unit_IsRepeat(Unit* unit);
 int Unit_ShouldShowLeftHandle(Unit* unit);
 int Unit_ShouldShowRightHandle(Unit* unit);
+void Unit_PushUndo(Unit* unit);
 
 typedef struct Group {
     struct Regex* Regex;
@@ -138,6 +149,8 @@ typedef struct Group {
     Vec2i Size;
     int WireHeight;
 } Group;
+
+void Group_PushUndo(Group* group);
 
 typedef struct Set {
     int NumItems;
@@ -151,6 +164,7 @@ typedef struct Set {
 
 void Set_AddItem(Set* set, struct SetItem* item, int index);
 struct SetItem* Set_RemoveItem(Set* set, int index);
+void Set_PushUndo(Set* set);
 
 typedef struct SetItemRange {
     struct LitChar Min;
@@ -167,10 +181,6 @@ typedef struct SetItem {
     mu_Rect LastRect;
 } SetItem;
 
-typedef struct Special {
-    int Type;
-} Special;
-
-const char* Special_GetHumanString(Special* s);
+void SetItem_PushUndo(SetItem* item);
 
 char* ToString(Regex* regex);

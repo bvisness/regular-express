@@ -44,15 +44,18 @@ for cfile in glob.glob('../src/**/*.c', recursive=True):
     subprocess.run([clang] + flags + ['-o', ofile, cfile])
     ofiles.append(ofile)
 
+page_bytes = 65536
+num_pages = 256
+
 subprocess.run([
     wasmld,
     '--no-entry',
     '--export-all', '--no-gc-sections',
     '--allow-undefined',
     '--import-memory',
-    '--initial-memory=655360',
+    '--initial-memory={}'.format(page_bytes * num_pages),
     '--lto-O2',
     '-o', 'regex.wasm',
 ] + ofiles)
 
-subprocess.run(['wasm2wat', 'regex.wasm'], stdout=open('regex.wat', 'w'))
+# subprocess.run(['wasm2wat', 'regex.wasm'], stdout=open('regex.wat', 'w'))

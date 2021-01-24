@@ -1,9 +1,10 @@
 #include "alloc.h"
 #include "textinput.h"
+#include "../undo.h"
 
 #define RE_DEFINE_POOL(T) 			\
 Pool RE_POOL_NAME(T);				\
-Pool* RE_GET_POOL(T)() {				\
+Pool* RE_GET_POOL(T)() {			\
 	if (!pool_##T.buf) {			\
 		POOL_INIT(T, &pool_##T);	\
 	}								\
@@ -11,15 +12,35 @@ Pool* RE_GET_POOL(T)() {				\
 	return &pool_##T;				\
 }
 
+#define POOL_PUSH_UNDO(T)														\
+	Undo_Push(&pool_##T.count, sizeof(pool_##T.count), #T " pool count");		\
+	Undo_Push(&pool_##T.head, sizeof(pool_##T.head), #T " pool head pointer");	\
+	Undo_Push(pool_##T.head, sizeof(PoolFreeNode), #T " pool head node");
+
 RE_DEFINE_POOL(Regex);
 RE_DEFINE_POOL(NoUnionEx);
 RE_DEFINE_POOL(Unit);
-RE_DEFINE_POOL(UnitContents);
-RE_DEFINE_POOL(MetaChar);
-RE_DEFINE_POOL(Special);
 RE_DEFINE_POOL(Set);
 RE_DEFINE_POOL(SetItem);
 RE_DEFINE_POOL(Group);
+
+void print_pools() {
+	RE_PRINT_POOL(Regex);
+	RE_PRINT_POOL(NoUnionEx);
+	RE_PRINT_POOL(Unit);
+	RE_PRINT_POOL(Set);
+	RE_PRINT_POOL(SetItem);
+	RE_PRINT_POOL(Group);
+}
+
+void pools_push_undo() {
+	POOL_PUSH_UNDO(Regex);
+	POOL_PUSH_UNDO(NoUnionEx);
+	POOL_PUSH_UNDO(Unit);
+	POOL_PUSH_UNDO(Set);
+	POOL_PUSH_UNDO(SetItem);
+	POOL_PUSH_UNDO(Group);
+}
 
 Regex* Regex_init(Regex* regex) {
 	regex->UnionMembers[0] = NoUnionEx_init(RE_NEW(NoUnionEx));
@@ -100,9 +121,7 @@ void UnitContents_SetType(UnitContents* contents, int type) {
 			MetaChar_init(&contents->MetaChar);
 		} break;
 		case RE_CONTENTS_SPECIAL: {
-			if (!contents->Special) {
-				contents->Special = Special_init(RE_NEW(Special));
-			}
+			Special_init(&contents->Special);
 		} break;
 		case RE_CONTENTS_SET: {
 			if (!contents->Set) {
@@ -135,9 +154,6 @@ void NoUnionEx_delete(NoUnionEx* ex) {
 
 void Unit_delete(Unit* unit) {
 	UnitContents* contents = &unit->Contents;
-	if (contents->Special) {
-		Special_delete(contents->Special);
-	}
 	if (contents->Set) {
 		Set_delete(contents->Set);
 	}
@@ -146,10 +162,6 @@ void Unit_delete(Unit* unit) {
 	}
 
 	RE_FREE(Unit, unit);
-}
-
-void Special_delete(Special* special) {
-	RE_FREE(Special, special);
 }
 
 void Set_delete(Set* set) {

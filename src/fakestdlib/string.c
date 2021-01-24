@@ -23,3 +23,14 @@ char* strchr(const char* str, int ch) {
 
     return NULL;
 }
+
+int memcmp(const void* lhs, const void* rhs, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        unsigned char lbyte = *((unsigned char*)lhs + i);
+        unsigned char rbyte = *((unsigned char*)rhs + i);
+        if (lbyte < rbyte) return -1;
+        if (lbyte > rbyte) return 1;
+    }
+
+    return 0;
+}
