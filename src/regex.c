@@ -242,7 +242,9 @@ int frame(float dt) {
 
 	mu_end(ctx);
 
-	Undo_Commit();
+	if (!ctx->mouse_down) {
+		Undo_Commit();
+	}
 
 	canvas_clear();
 	mu_Command *cmd = NULL;

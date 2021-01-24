@@ -235,6 +235,8 @@ void Unit_PushUndo(Unit* unit) {
 
     UNDOPUSH(unit->RepeatMin);
     UNDOPUSH(unit->RepeatMax);
+    UNDOPUSH(unit->_minbuf);
+    UNDOPUSH(unit->_maxbuf);
     UNDOPUSH(unit->Parent);
     UNDOPUSH(unit->Index);
 }
