@@ -8,3 +8,5 @@ void Undo_Redo();
 void Undo_Reset();
 
 void PrintUndoData();
+
+#define UNDOPUSH(expr) Undo_Push(&expr, sizeof(expr), #expr);

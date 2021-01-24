@@ -3,8 +3,6 @@
 
 const char* SPECIAL_CHARACTERS = "()[]{}*+?.\\|^$";
 
-#define UNDOPUSH(expr) Undo_Push(&expr, sizeof(expr), #expr);
-
 void Regex_AddUnionMember(Regex* regex, struct NoUnionEx* ex, int index) {
     assert(regex->NumUnionMembers < MAX_UNION_MEMBERS);
 

@@ -105,6 +105,7 @@ int frame(float dt) {
 		Undo_Undo();
 	}
 
+	UNDOPUSH(ctx->focus);
 	Regex_PushUndo(regex);
 
 	prepass_Regex(regex, NULL);
