@@ -127,7 +127,7 @@ void PrintUndoItem(UndoItem* item) {
         sprintBytes(storedBuf, item->Data, item->Size, 8);
         sprintBytes(currentBuf, item->Pointer, item->Size, 8);
 
-        printf("(UNDO ITEM) [%s]\n  @%p, Size: %zu\n  Stored: %s\n  Current: %s", desc, item->Pointer, item->Size, storedBuf, currentBuf);
+        printf("(UNDO ITEM) [%s]\n  @%p, Size: %zu\n  Stored: %s (int: %d)\n  Current: %s (int: %d)", desc, item->Pointer, item->Size, storedBuf, *(int*)item->Data, currentBuf, *(int*)item->Pointer);
     }
 }
 

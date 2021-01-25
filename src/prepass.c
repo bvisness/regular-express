@@ -65,6 +65,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                 && previousUnit->Contents.Type == RE_CONTENTS_METACHAR
         ) {
             // break the previous metachar
+
             ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 
             char c = previousUnit->Contents.MetaChar.C;
@@ -85,8 +86,11 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
             );
         } else if (ctx->key_pressed & MU_KEY_BACKSPACE
                 && !TextState_IsSelecting(ex->TextState)
+                && ex->Index > 0
                 && ex->TextState.InsertIndex == 0
         ) {
+            // backspace at beginning of expression; collapse into previous
+
             NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
             int index = previousEx->NumUnits;
 
@@ -104,6 +108,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
         } else if (inputTextLength > 1) {
             // assume we are pasting and want to parse a regex
             // TODO: We should probably explicitly detect that we are pasting.
+
             Regex* parseResult = parse(ctx->input_text);
 
             if (parseResult->NumUnionMembers == 1) {
@@ -125,6 +130,8 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 
             Regex_delete(parseResult);
         } else {
+            // type a single key
+
             TextEditResult result = StandardTextInput(ctx, ex->TextState, ex->NumUnits);
 
             if (result.DoDelete) {

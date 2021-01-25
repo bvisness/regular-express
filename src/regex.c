@@ -97,12 +97,16 @@ int frame(float dt) {
 	) {
 		ctx->input_text[0] = 0;
 		Undo_Redo();
+		// PrintUndoData();
+		// print_pools();
 	} else if (
 		ctx->key_down & MU_KEY_CTRL
 		&& ctx->input_text[0] == 'z'
 	) {
 		ctx->input_text[0] = 0;
 		Undo_Undo();
+		// PrintUndoData();
+		// print_pools();
 	}
 
 	UNDOPUSH(ctx->focus);

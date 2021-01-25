@@ -232,8 +232,13 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
         NoUnionEx* newMember = NoUnionEx_init(RE_NEW(NoUnionEx));
         Regex_AddUnionMember(regex, newMember, -1);
 
-        Unit* initialUnit = Unit_init(RE_NEW(Unit));
-        NoUnionEx_AddUnit(newMember, initialUnit, -1);
+        const char* initialString = "hello";
+        for (int i = 0; i < strlen(initialString); i++) {
+            Unit* unit = Unit_initWithLiteralChar(RE_NEW(Unit), initialString[i]);
+            NoUnionEx_AddUnit(newMember, unit, -1);
+        }
+
+        mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newMember, sizeof(NoUnionEx*)));
     }
 
     mu_pop_id(ctx);

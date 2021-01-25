@@ -7,12 +7,18 @@
 #define RE_POOL_NAME(T) pool_##T
 #define RE_GET_POOL(T) getPool_##T
 #define RE_GET_POOL_DEF(T) Pool* RE_GET_POOL(T)()
-#define RE_NEW(T) (                                                                      \
-        Undo_Push(getPool_##T()->head, sizeof(PoolFreeNode), #T " pool head node"),                           \
-        Undo_Push(&getPool_##T()->head, sizeof(PoolFreeNode*), #T " pool head pointer"),                           \
-        (T*) pool_alloc(getPool_##T())                                               \
+#define RE_NEW(T) (                                                                         \
+        Undo_Push(&getPool_##T()->count, sizeof(int), #T " pool count"),                    \
+        Undo_Push(getPool_##T()->head, sizeof(T), #T " pool head node"),                    \
+        Undo_Push(&getPool_##T()->head, sizeof(PoolFreeNode*), #T " pool head pointer"),    \
+        (T*) pool_alloc(getPool_##T())                                                      \
     )
-#define RE_FREE(T, ptr) pool_free(RE_GET_POOL(T)(), ptr)
+#define RE_FREE(T, ptr) (                                                                   \
+        Undo_Push(&getPool_##T()->count, sizeof(int), #T " pool count"),                    \
+        Undo_Push(ptr, sizeof(T), #T " freed ptr"),                                         \
+        Undo_Push(&getPool_##T()->head, sizeof(PoolFreeNode*), #T " pool head pointer"),    \
+        pool_free(RE_GET_POOL(T)(), ptr)                                                    \
+    )
 #define RE_PRINT_POOL(T) printf(#T " pool (max %d): %d", POOL_SIZE, RE_GET_POOL(T)()->count);
 
 RE_GET_POOL_DEF(Regex);
