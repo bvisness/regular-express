@@ -252,10 +252,12 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
     // check if we were selected by a box select
     if (drag.Type == DRAG_TYPE_BOX_SELECT && drag.BoxSelect.Result.Ex == ex) {
         mu_set_focus(ctx, muid);
-        ex->TextState = (TextInputState) {
-            .SelectionBase = drag.BoxSelect.Result.Start,
-            .InsertIndex = drag.BoxSelect.Result.End + 1,
-        };
+
+        TextInputState newState = DEFAULT_TEXT_INPUT_STATE;
+        newState = TextState_SetInsertIndex(newState, drag.BoxSelect.Result.Start, 0);
+        newState = TextState_MoveCursor(newState, drag.BoxSelect.Result.End - drag.BoxSelect.Result.Start + 1, 1);
+        ex->TextState = newState;
+
         drag.BoxSelect.Result = (UnitRange) {0};
     }
 
@@ -400,6 +402,11 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
     int shouldShowLeftHandle = Unit_ShouldShowLeftHandle(unit);
     int shouldShowRightHandle = Unit_ShouldShowRightHandle(unit);
 
+    if (drag.Type == DRAG_TYPE_BOX_SELECT) {
+        shouldShowLeftHandle = 0;
+        shouldShowRightHandle = 0;
+    }
+
     unit->IsShowingLeftHandle = shouldShowLeftHandle;
     unit->IsShowingRightHandle = shouldShowRightHandle;
 
@@ -494,10 +501,12 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
     int targetRightHandleZoneWidth = shouldShowRightHandle ? UNIT_HANDLE_ZONE_WIDTH : 0;
 
     int animating = 0;
-    unit->LeftHandleZoneWidth = interp_linear(ctx->dt, unit->LeftHandleZoneWidth, targetLeftHandleZoneWidth, 160, &animating);
-    ctx->animating |= animating;
-    unit->RightHandleZoneWidth = interp_linear(ctx->dt, unit->RightHandleZoneWidth, targetRightHandleZoneWidth, 160, &animating);
-    ctx->animating |= animating;
+    if (drag.Type != DRAG_TYPE_BOX_SELECT) {
+        unit->LeftHandleZoneWidth = interp_linear(ctx->dt, unit->LeftHandleZoneWidth, targetLeftHandleZoneWidth, 160, &animating);
+        ctx->animating |= animating;
+        unit->RightHandleZoneWidth = interp_linear(ctx->dt, unit->RightHandleZoneWidth, targetRightHandleZoneWidth, 160, &animating);
+        ctx->animating |= animating;
+    }
 
     mu_Rect leftHandleZoneRect = mu_rect(
         rect.x,
@@ -512,7 +521,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
         rect.h
     );
 
-    if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, contentsRect)) {
+    if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, contentsRect) && !drag.Type) {
         if (unit->Contents.Type == RE_CONTENTS_SET) {
             // do nothing, let the set handle the click
         } else {

@@ -278,6 +278,7 @@ void mu_input_scroll(mu_Context *ctx, int x, int y);
 void mu_input_keydown(mu_Context *ctx, int key);
 void mu_input_keyup(mu_Context *ctx, int key);
 void mu_input_text(mu_Context *ctx, const char *text);
+void mu_input_clear(mu_Context *ctx);
 
 mu_Command* mu_push_command(mu_Context *ctx, int type, int size);
 int mu_next_command(mu_Context *ctx, mu_Command **cmd);

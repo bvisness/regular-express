@@ -228,15 +228,15 @@
 				window.requestAnimationFrame(doFrame);
 			}
 
-			canvas.addEventListener('mousemove', e => {
+			window.addEventListener('mousemove', e => {
 				test.exports.mouseMove(e.clientX, e.clientY);
 				wakeUp();
 			});
-			canvas.addEventListener('mousedown', e => {
+			window.addEventListener('mousedown', e => {
 				test.exports.mouseDown(e.clientX, e.clientY);
 				wakeUp();
 			});
-			canvas.addEventListener('mouseup', e => {
+			window.addEventListener('mouseup', e => {
 				test.exports.mouseUp(e.clientX, e.clientY);
 				wakeUp();
 			});
@@ -327,6 +327,10 @@
 				}
 
 				test.exports.scroll(x, y);
+				wakeUp();
+			});
+			window.addEventListener('blur', () => {
+				test.exports.blur();
 				wakeUp();
 			});
 

@@ -64,6 +64,10 @@ void scroll(int x, int y) {
 	mu_input_scroll(ctx, x, y);
 }
 
+void blur() {
+	mu_input_clear(ctx);
+}
+
 Regex* regex;
 
 void init() {
@@ -140,6 +144,8 @@ int frame(float dt) {
 					0
 				);
 			} else if (drag.Type == DRAG_TYPE_BOX_SELECT) {
+				mu_set_focus(ctx, 0);
+
 				UnitRange newSelection = {0};
 				for (int i = 0; i < MAX_POTENTIAL_SELECTS; i++) {
 					PotentialSelect* potential = &drag.BoxSelect.Potentials[i];
@@ -170,6 +176,7 @@ int frame(float dt) {
 			} else if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
 				drawRailroad_NoUnionEx(&moveUnitsEx, (Vec2i) { .x = ctx->mouse_pos.x, .y = ctx->mouse_pos.y }, 0);
 			} else if (drag.Type == DRAG_TYPE_CREATE_UNION) {
+				// TODO: Fix this crap
 				mu_draw_rect(
 					ctx,
 					mu_rect(
@@ -243,6 +250,8 @@ int frame(float dt) {
 		}
 
 		drag = (DragContext) {0};
+
+		ctx->animating = 1;
 	}
 
 	mu_end(ctx);

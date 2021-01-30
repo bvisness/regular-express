@@ -461,6 +461,17 @@ void mu_input_text(mu_Context *ctx, const char *text) {
 }
 
 
+void mu_input_clear(mu_Context *ctx) {
+  ctx->key_pressed = 0;
+  ctx->key_down = 0;
+  ctx->mouse_down = 0;
+  ctx->mouse_pressed = 0;
+  ctx->mouse_released = 0;
+  ctx->mouse_is_dragging = 0;
+  ctx->mouse_started_drag = 0;
+}
+
+
 /*============================================================================
 ** commandlist
 **============================================================================*/
