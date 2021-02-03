@@ -236,8 +236,9 @@ int frame(float dt) {
 	// mouse up; end all drags
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {
 		if (drag.Type == DRAG_TYPE_MOVE_UNITS) {
+			// Drop the units back in their original place
 			MoveAllUnitsTo(drag.MoveUnits.OriginEx, drag.MoveUnits.OriginIndex);
-
+			mu_set_focus(ctx, NoUnionEx_GetID(drag.MoveUnits.OriginEx));
 		} else if (drag.Type == DRAG_TYPE_CREATE_UNION) {
 			UnitRange units = drag.CreateUnion.Units;
 

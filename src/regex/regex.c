@@ -1,5 +1,6 @@
 #include "regex.h"
 #include "../undo.h"
+#include "../globals.h"
 
 const char* SPECIAL_CHARACTERS = "()[]{}*+?.\\|^$";
 
@@ -56,6 +57,10 @@ void Regex_PushUndo(Regex* regex) {
     for (int i = 0; i < regex->NumUnionMembers; i++) {
         NoUnionEx_PushUndo(regex->UnionMembers[i]);
     }
+}
+
+mu_Id NoUnionEx_GetID(NoUnionEx* ex) {
+    return mu_get_id_noidstack(ctx, &ex, sizeof(NoUnionEx*));
 }
 
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index) {

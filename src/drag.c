@@ -1,8 +1,13 @@
 #include "drag.h"
+#include "microui.h"
+#include "regex/textinput.h"
+#include "range.h"
 
 void MoveAllUnitsTo(NoUnionEx* ex, int index) {
-    while (moveUnitsEx.NumUnits > 0) {
-        Unit* unit = NoUnionEx_RemoveUnit(&moveUnitsEx, -1);
-        NoUnionEx_AddUnit(ex, unit, index);
-    }
+    UnitRange all = (UnitRange) {
+        .Ex = &moveUnitsEx,
+        .Start = 0,
+        .End = moveUnitsEx.NumUnits - 1,
+    };
+    MoveUnitsTo(all, ex, index);
 }

@@ -86,6 +86,15 @@ TextInputState TextState_SetCursorRight(TextInputState state, int cursorRight) {
     return result;
 }
 
+TextInputState TextState_SelectRange(int min, int max) {
+    return (TextInputState) {
+        .InsertIndex = max + 1,
+        .CursorIndex = max,
+        .CursorRight = 1,
+        .SelectionBase = min,
+    };
+}
+
 TextInputState TextState_Clamp(TextInputState state, int minInsertIndex, int maxInsertIndex) {
     TextInputState result = state;
 
@@ -237,10 +246,7 @@ TextEditResult StandardTextInput(mu_Context* ctx, TextInputState textState, int 
     } else if (ctx->key_down & MU_KEY_CTRL && ctx->input_text[0] == 'a') {
         ctx->input_text[0] = 0;
         result = (TextEditResult) {
-            .ResultState = (TextInputState) {
-                .InsertIndex = maxIndex,
-                .SelectionBase = 0,
-            },
+            .ResultState = TextState_SelectRange(0, maxIndex),
         };
     } else if (ctx->input_text[0] != 0) {
         result = TextState_InsertString(textState);

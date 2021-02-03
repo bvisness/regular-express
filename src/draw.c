@@ -611,6 +611,7 @@ void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, U
                 }
 
                 MoveUnitsTo(unitsToMove, &moveUnitsEx, 0);
+                mu_set_focus(ctx, NoUnionEx_GetID(&moveUnitsEx));
 
                 drag = (DragContext) {
                     .Type = DRAG_TYPE_MOVE_UNITS,

@@ -59,6 +59,7 @@ typedef struct NoUnionEx {
     int ClickedUnitIndex;
 } NoUnionEx;
 
+mu_Id NoUnionEx_GetID(NoUnionEx* ex);
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index);
 struct Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index);
 void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit);

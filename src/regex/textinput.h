@@ -17,6 +17,7 @@ TextInputState TextState_SetInsertIndex(TextInputState state, int i, int select)
 TextInputState TextState_MoveCursor(TextInputState state, int delta, int select);
 TextInputState TextState_BumpCursor(TextInputState state, int direction, int select);
 TextInputState TextState_SetCursorRight(TextInputState state, int cursorRight);
+TextInputState TextState_SelectRange(int min, int max);
 TextInputState TextState_Clamp(TextInputState state, int minInsertIndex, int maxInsertIndex);
 
 int TextState_IsSelecting(TextInputState state);
