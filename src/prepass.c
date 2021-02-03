@@ -194,57 +194,54 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                     newUnit = Unit_init(RE_NEW(Unit));
                     UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
                     newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '/') {
-                    // question mark
+                } else if (
+                    ctx->key_down & MU_KEY_ALT && (
+                        ctx->input_text[0] == '/' // question mark
+                        || ctx->input_text[0] == '=' // plus
+                        || ctx->input_text[0] == '8' // asterisk
+                    )
+                ) {
                     Unit* repeatUnit = previousUnit;
-                    if (selectedUnits.Ex && selectedUnits.End - selectedUnits.Start > 0) {
-                        ConvertRangeToGroup(selectedUnits);
-                        ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
-                        ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
+                    if (selectedUnits.Ex) {
+                        if (selectedUnits.End - selectedUnits.Start > 0) {
+                            ConvertRangeToGroup(selectedUnits);
+                            ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
+                            ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
+                        }
                         repeatUnit = ex->Units[selectedUnits.Start];
                     }
 
-                    if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 1) {
-                        Unit_SetRepeatMin(repeatUnit, 1);
-                        Unit_SetRepeatMax(repeatUnit, 1);
-                    } else {
-                        Unit_SetRepeatMin(repeatUnit, 0);
-                        Unit_SetRepeatMax(repeatUnit, 1);
-                    }
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '=') {
-                    // plus
-                    Unit* repeatUnit = previousUnit;
-                    if (selectedUnits.Ex && selectedUnits.End - selectedUnits.Start > 0) {
-                        ConvertRangeToGroup(selectedUnits);
-                        ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
-                        ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
-                        repeatUnit = ex->Units[selectedUnits.Start];
-                    }
-
-                    if (repeatUnit->RepeatMin == 1 && repeatUnit->RepeatMax == 0) {
-                        Unit_SetRepeatMin(repeatUnit, 1);
-                        Unit_SetRepeatMax(repeatUnit, 1);
-                    } else {
-                        Unit_SetRepeatMin(repeatUnit, 1);
-                        Unit_SetRepeatMax(repeatUnit, 0);
-                    }
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '8') {
-                    // asterisk
-                    Unit* repeatUnit = previousUnit;
-                    if (selectedUnits.Ex && selectedUnits.End - selectedUnits.Start > 0) {
-                        ConvertRangeToGroup(selectedUnits);
-                        ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
-                        ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
-                        repeatUnit = ex->Units[selectedUnits.Start];
+                    switch (ctx->input_text[0]) {
+                    case '/': { // question mark
+                        if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 1) {
+                            Unit_SetRepeatMin(repeatUnit, 1);
+                            Unit_SetRepeatMax(repeatUnit, 1);
+                        } else {
+                            Unit_SetRepeatMin(repeatUnit, 0);
+                            Unit_SetRepeatMax(repeatUnit, 1);
+                        }
+                    } break;
+                    case '=': { // plus
+                        if (repeatUnit->RepeatMin == 1 && repeatUnit->RepeatMax == 0) {
+                            Unit_SetRepeatMin(repeatUnit, 1);
+                            Unit_SetRepeatMax(repeatUnit, 1);
+                        } else {
+                            Unit_SetRepeatMin(repeatUnit, 1);
+                            Unit_SetRepeatMax(repeatUnit, 0);
+                        }
+                    } break;
+                    case '8': { // asterisk
+                        if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 0) {
+                            Unit_SetRepeatMin(repeatUnit, 1);
+                            Unit_SetRepeatMax(repeatUnit, 1);
+                        } else {
+                            Unit_SetRepeatMin(repeatUnit, 0);
+                            Unit_SetRepeatMax(repeatUnit, 0);
+                        }
+                    } break;
                     }
 
-                    if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 0) {
-                        Unit_SetRepeatMin(repeatUnit, 1);
-                        Unit_SetRepeatMax(repeatUnit, 1);
-                    } else {
-                        Unit_SetRepeatMin(repeatUnit, 0);
-                        Unit_SetRepeatMax(repeatUnit, 0);
-                    }
+                    ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
                 } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '\\') {
                     // pipe
                     NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
