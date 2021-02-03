@@ -164,7 +164,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                     newUnit = Unit_init(RE_NEW(Unit));
                     UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
                     mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '9') {
+                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '(') {
                     // open paren (create group)
                     if (TextState_IsSelecting(ex->TextState)) {
                         ConvertRangeToGroup(selectedUnits);
@@ -175,7 +175,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                         UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
                         mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
                     }
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '0') {
+                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == ')') {
                     // close paren (leave group)
                     if (parentEx) {
                         mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
@@ -196,9 +196,9 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                     newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
                 } else if (
                     ctx->key_down & MU_KEY_ALT && (
-                        ctx->input_text[0] == '/' // question mark
-                        || ctx->input_text[0] == '=' // plus
-                        || ctx->input_text[0] == '8' // asterisk
+                        ctx->input_text[0] == '?'
+                        || ctx->input_text[0] == '+'
+                        || ctx->input_text[0] == '*'
                     )
                 ) {
                     Unit* repeatUnit = previousUnit;
@@ -212,7 +212,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                     }
 
                     switch (ctx->input_text[0]) {
-                    case '/': { // question mark
+                    case '?': {
                         if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 1) {
                             Unit_SetRepeatMin(repeatUnit, 1);
                             Unit_SetRepeatMax(repeatUnit, 1);
@@ -221,7 +221,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                             Unit_SetRepeatMax(repeatUnit, 1);
                         }
                     } break;
-                    case '=': { // plus
+                    case '+': {
                         if (repeatUnit->RepeatMin == 1 && repeatUnit->RepeatMax == 0) {
                             Unit_SetRepeatMin(repeatUnit, 1);
                             Unit_SetRepeatMax(repeatUnit, 1);
@@ -230,7 +230,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                             Unit_SetRepeatMax(repeatUnit, 0);
                         }
                     } break;
-                    case '8': { // asterisk
+                    case '*': {
                         if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 0) {
                             Unit_SetRepeatMin(repeatUnit, 1);
                             Unit_SetRepeatMax(repeatUnit, 1);
