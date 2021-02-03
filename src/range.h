@@ -14,3 +14,4 @@ typedef struct UnitRange {
 
 void MoveUnitsTo(UnitRange range, NoUnionEx* ex, int startIndex);
 Unit* ConvertRangeToGroup(UnitRange range);
+void DeleteRange(UnitRange range);

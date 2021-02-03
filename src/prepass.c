@@ -158,6 +158,9 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
             if (result.DoInput && inputTextLength == 1) {
                 Unit* newUnit = NULL;
                 if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '[') {
+                    if (selectedUnits.Ex) {
+                        DeleteRange(selectedUnits);
+                    }
                     newUnit = Unit_init(RE_NEW(Unit));
                     UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
                     mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));

@@ -1,5 +1,6 @@
 #include "range.h"
 #include "globals.h"
+#include "util/math.h"
 
 void MoveUnitsTo(UnitRange range, NoUnionEx* ex, int startIndex) {
     mu_Id exId = NoUnionEx_GetID(range.Ex);
@@ -43,4 +44,39 @@ Unit* ConvertRangeToGroup(UnitRange range) {
     NoUnionEx_AddUnit(range.Ex, newUnit, range.Start);
 
     return newUnit;
+}
+
+void DeleteRange(UnitRange range) {
+    int delMin = iclamp(range.Start, 0, range.Ex->NumUnits);
+    int delMax = iclamp(range.End, 0, range.Ex->NumUnits);
+
+    // Adjust text input state, keeping in mind that parts of the state
+    // may be either in the deleted range or after the deleted range.
+    TextInputState newTextState = range.Ex->TextState;
+    if (delMax < range.Ex->TextState.InsertIndex) {
+        newTextState.InsertIndex -= (delMax - delMin + 1);
+        newTextState.CursorIndex -= (delMax - delMin + 1);
+    } else if (
+        delMin <= range.Ex->TextState.InsertIndex
+        && range.Ex->TextState.InsertIndex <= delMax
+    ) {
+        newTextState.InsertIndex = delMin;
+        newTextState.CursorIndex = delMin;
+        newTextState.CursorRight = 0;
+    }
+    if (delMax < range.Ex->TextState.SelectionBase) {
+        newTextState.SelectionBase -= (delMax - delMin + 1);
+    } else if (
+        delMin <= range.Ex->TextState.SelectionBase
+        && range.Ex->TextState.SelectionBase <= delMax
+    ) {
+        newTextState.SelectionBase = delMin;
+    }
+
+    for (int i = 0; i <= delMax - delMin; i++) {
+        Unit* deleted = NoUnionEx_RemoveUnit(range.Ex, delMin);
+        Unit_delete(deleted);
+    }
+
+    range.Ex->TextState = newTextState;
 }
