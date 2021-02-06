@@ -74,7 +74,6 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 && previousUnit->Contents.Type == RE_CONTENTS_METACHAR
         ) {
             // break the previous metachar
-
             ctx->key_pressed &= ~MU_KEY_BACKSPACE;
 
             char c = previousUnit->Contents.MetaChar.C;
@@ -99,7 +98,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 && ex->TextState.InsertIndex == 0
         ) {
             // backspace at beginning of expression; collapse into previous
-
+            ctx->key_pressed &= ~MU_KEY_BACKSPACE;
             NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
             int index = previousEx->NumUnits;
 
@@ -112,12 +111,64 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 previousEx,
                 index
             );
-            ctx->focus = mu_get_id_noidstack(ctx, &previousEx, sizeof(NoUnionEx*));
-            previousEx->TextState.InsertIndex = index;
+            mu_set_focus(ctx, NoUnionEx_GetID(previousEx));
+            previousEx->TextState = TextState_SetInsertIndex(previousEx->TextState, index, 0);
+        } else if (ctx->key_pressed & MU_KEY_DELETE
+                && !TextState_IsSelecting(ex->TextState)
+                && ex->Index < (regex->NumUnionMembers - 1)
+                && ex->TextState.InsertIndex == ex->NumUnits
+        ) {
+            // delete at end of expression; collapse next into current
+            ctx->key_pressed &= ~MU_KEY_DELETE;
+            NoUnionEx* nextEx = regex->UnionMembers[ex->Index + 1];
+            MoveUnitsTo(
+                (UnitRange) {
+                    .Ex = nextEx,
+                    .Start = 0,
+                    .End = nextEx->NumUnits - 1,
+                },
+                ex,
+                ex->NumUnits
+            );
+        } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT
+                && !TextState_IsSelecting(ex->TextState)
+                && ex->Index < (regex->NumUnionMembers - 1)
+                && ex->TextState.InsertIndex == ex->NumUnits
+        ) {
+            ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+            NoUnionEx* nextEx = regex->UnionMembers[ex->Index + 1];
+            mu_set_focus(ctx, NoUnionEx_GetID(nextEx));
+            nextEx->TextState = TextState_SetCursorIndex(0, 0);
+        } else if (ctx->key_pressed & MU_KEY_ARROWLEFT
+                && !TextState_IsSelecting(ex->TextState)
+                && ex->Index > 0
+                && ex->TextState.InsertIndex == 0
+        ) {
+            ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+            NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
+            mu_set_focus(ctx, NoUnionEx_GetID(previousEx));
+            previousEx->TextState = TextState_SetCursorIndex(previousEx->NumUnits - 1, 1);
+        } else if (ctx->key_down & MU_KEY_ALT && ctx->key_pressed & MU_KEY_ARROWDOWN) {
+            ctx->key_pressed &= ~MU_KEY_ARROWDOWN;
+            if (ex->Index < regex->NumUnionMembers - 1) {
+                NoUnionEx* nextEx = regex->UnionMembers[ex->Index + 1];
+                mu_set_focus(ctx, NoUnionEx_GetID(nextEx));
+                nextEx->TextState = ex->TextState;
+                nextEx->TextState.SelectionBase = -1;
+            }
+        } else if (ctx->key_down & MU_KEY_ALT && ctx->key_pressed & MU_KEY_ARROWUP) {
+            ctx->key_pressed &= ~MU_KEY_ARROWUP;
+            if (ex->Index > 0) {
+                NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
+                mu_set_focus(ctx, NoUnionEx_GetID(previousEx));
+                previousEx->TextState = ex->TextState;
+                previousEx->TextState.SelectionBase = -1;
+            }
         } else if (ctx->key_pressed & MU_KEY_ARROWDOWN) {
             // Jump down into the group the cursor is on
             Unit* cursorUnit = ex->Units[ex->TextState.CursorIndex];
             if (cursorUnit->Contents.Type == RE_CONTENTS_GROUP && !TextState_IsSelecting(ex->TextState)) {
+                ctx->key_pressed &= ~MU_KEY_ARROWDOWN;
                 NoUnionEx* destEx = cursorUnit->Contents.Group->Regex->UnionMembers[0]; // TODO: Is it possible that there could be no union members here?
                 mu_set_focus(ctx, NoUnionEx_GetID(destEx));
 
@@ -130,6 +181,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
         } else if (ctx->key_pressed & MU_KEY_ARROWUP) {
             // Jump up out of the current group
             if (parentUnit) {
+                ctx->key_pressed &= ~MU_KEY_ARROWUP;
                 mu_set_focus(ctx, NoUnionEx_GetID(parentEx));
                 int doCursorRight = ex->TextState.CursorIndex > (ex->NumUnits / 2);
                 parentEx->TextState = TextState_SetCursorIndex(parentUnit->Index, doCursorRight);
@@ -199,7 +251,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                     // close paren (leave group)
                     if (parentEx) {
                         mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
-
+                        parentEx->TextState = TextState_SetCursorIndex(parentUnit->Index, 1);
                     }
                 } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '6') {
                     // caret
