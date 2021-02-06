@@ -250,6 +250,10 @@ void Group_PushUndo(Group* group) {
     Regex_PushUndo(group->Regex);
 }
 
+mu_Id Set_GetID(Set* set) {
+    return mu_get_id_noidstack(ctx, &set, sizeof(Set*));
+}
+
 void Set_AddItem(Set* set, struct SetItem* item, int index) {
     assert(set->NumItems < MAX_SET_ITEMS);
 

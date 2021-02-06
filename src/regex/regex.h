@@ -164,6 +164,7 @@ typedef struct Set {
     Vec2i Size;
 } Set;
 
+mu_Id Set_GetID(Set* set);
 void Set_AddItem(Set* set, struct SetItem* item, int index);
 struct SetItem* Set_RemoveItem(Set* set, int index);
 void Set_PushUndo(Set* set);

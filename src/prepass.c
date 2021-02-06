@@ -177,6 +177,16 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 } else {
                     destEx->TextState = TextState_SetInsertIndex(destEx->TextState, 0, 0);
                 }
+            } else if (cursorUnit->Contents.Type == RE_CONTENTS_SET && !TextState_IsSelecting(ex->TextState)) {
+                ctx->key_pressed &= ~MU_KEY_ARROWDOWN;
+                Set* destSet = cursorUnit->Contents.Set;
+                mu_set_focus(ctx, Set_GetID(destSet));
+
+                if (ex->TextState.CursorRight) {
+                    destSet->TextState = TextState_SetInsertIndex(destSet->TextState, destSet->NumItems, 0);
+                } else {
+                    destSet->TextState = TextState_SetInsertIndex(destSet->TextState, 0, 0);
+                }
             }
         } else if (ctx->key_pressed & MU_KEY_ARROWUP) {
             // Jump up out of the current group
@@ -538,6 +548,12 @@ void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
             newItem->LitChar.C = itemBeforeCursor->MetaChar.C;
             Set_AddItem(set, newItem, set->TextState.InsertIndex);
             set->TextState = TextState_BumpCursor(set->TextState, 1, 0);
+        } else if (ctx->key_pressed & MU_KEY_ARROWUP) {
+            // Jump up out of the current set
+            ctx->key_pressed &= ~MU_KEY_ARROWUP;
+            mu_set_focus(ctx, NoUnionEx_GetID(ex));
+            int doCursorRight = set->TextState.CursorIndex > (set->NumItems / 2);
+            ex->TextState = TextState_SetCursorIndex(unit->Index, doCursorRight);
         } else {
             result = StandardTextInput(ctx, set->TextState, set->NumItems);
             set->TextState = result.ResultState;
