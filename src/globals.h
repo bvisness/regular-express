@@ -50,6 +50,6 @@ extern void copyText(char* text);
 #define COLOR_SPECIAL_BACKGROUND (mu_Color) { 170, 225, 170, 255 }
 #define COLOR_SELECTED_BACKGROUND (mu_Color) { 122, 130, 255, 255 }
 
-#define LEGAL_METACHARS "dDwWsSbBnt"
+#define LEGAL_METACHARS "dDwWsSbBnt0"
 
 GLOBAL mu_Context* ctx;

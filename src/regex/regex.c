@@ -543,6 +543,12 @@ char* toString_LitChar(char* base, LitChar* c) {
         return base;
     }
 
+    if (c->C == 0) {
+        // Actual null character, escape dat
+        base = writeLiteral(base, "\\0");
+        return base;
+    }
+
     int specialLen = strlen(SPECIAL_CHARACTERS);
     for (int i = 0; i < specialLen; i++) {
         if (c->C == SPECIAL_CHARACTERS[i]) {
