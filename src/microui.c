@@ -426,8 +426,11 @@ void mu_input_mousedown(mu_Context *ctx, int x, int y, int btn) {
 
 void mu_input_mouseup(mu_Context *ctx, int x, int y, int btn) {
   mu_input_mousemove(ctx, x, y);
+
+  if (ctx->mouse_down & btn) {
+    ctx->mouse_released |= btn;
+  }
   ctx->mouse_down &= ~btn;
-  ctx->mouse_released |= btn;
 
   if (!ctx->mouse_down) {
     ctx->mouse_down_pos = mu_vec2(0, 0);
@@ -872,6 +875,8 @@ int mu_button_ex(mu_Context *ctx, const char *label, int icon, int opt) {
   mu_update_control(ctx, id, r, opt);
   /* handle click */
   if (ctx->mouse_pressed == MU_MOUSE_LEFT && ctx->focus == id) {
+    ctx->mouse_down &= ~MU_MOUSE_LEFT;
+    ctx->mouse_pressed &= ~MU_MOUSE_LEFT;
     res |= MU_RES_SUBMIT;
   }
   /* draw */

@@ -186,6 +186,32 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 int doCursorRight = ex->TextState.CursorIndex > (ex->NumUnits / 2);
                 parentEx->TextState = TextState_SetCursorIndex(parentUnit->Index, doCursorRight);
             }
+        } if (ctx->key_pressed & MU_KEY_RETURN) {
+            // enter
+            ctx->key_pressed &= ~MU_KEY_RETURN;
+
+            if (TextState_IsSelecting(ex->TextState)) {
+                // make a group out of the current selection and add a union member
+                Unit* newUnit = ConvertRangeToGroup(selectedUnits);
+                NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
+                Regex_AddUnionMember(newUnit->Contents.Group->Regex, newEx, -1);
+                mu_set_focus(ctx, NoUnionEx_GetID(newEx));
+            } else {
+                // split the current expression at the cursor
+                NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
+                MoveUnitsTo(
+                    (UnitRange) {
+                        .Ex = ex,
+                        .Start = ex->TextState.InsertIndex,
+                        .End = ex->NumUnits - 1,
+                    },
+                    newEx,
+                    0
+                );
+                Regex_AddUnionMember(regex, newEx, ex->Index + 1);
+
+                mu_set_focus(ctx, NoUnionEx_GetID(newEx));
+            }
         } else if (inputTextLength > 1) {
             // assume we are pasting and want to parse a regex
             // TODO: We should probably explicitly detect that we are pasting.
@@ -329,7 +355,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                     );
                     Regex_AddUnionMember(regex, newEx, ex->Index + 1);
 
-                    ctx->focus = mu_get_id_noidstack(ctx, &newEx, sizeof(NoUnionEx*));
+                    mu_set_focus(ctx, NoUnionEx_GetID(newEx));
                 } else if (previousUnit
                             && previousUnit->Contents.Type == RE_CONTENTS_LITCHAR
                             && previousUnit->Contents.LitChar.C == '\\'

@@ -229,6 +229,8 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
     const int PLUS_BUTTON_WIDTH = 30;
     mu_layout_set_next(ctx, mu_rect(origin.x + regex->Size.x/2 - PLUS_BUTTON_WIDTH/2, memberOrigin.y + 10, PLUS_BUTTON_WIDTH, 20), 0);
     if (mu_button(ctx, "+")) {
+        ctx->animating = 1;
+
         NoUnionEx* newMember = NoUnionEx_init(RE_NEW(NoUnionEx));
         Regex_AddUnionMember(regex, newMember, -1);
 
@@ -238,7 +240,8 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
             NoUnionEx_AddUnit(newMember, unit, -1);
         }
 
-        mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newMember, sizeof(NoUnionEx*)));
+        mu_set_focus(ctx, NoUnionEx_GetID(newMember));
+        newMember->TextState = TextState_SelectRange(0, newMember->NumUnits-1);
     }
 
     mu_pop_id(ctx);
@@ -335,7 +338,9 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
 
             mu_layout_set_next(ctx, mu_rect(sbb.x + sbb.w/2 - BUTTON_WIDTH/2, sbb.y - 20, BUTTON_WIDTH, 20), 0);
             if (!drag.Type && mu_button(ctx, "Make Group")) {
-                ConvertRangeToGroup(selection);
+                Unit* newUnit = ConvertRangeToGroup(selection);
+                mu_set_focus(ctx, NoUnionEx_GetID(selection.Ex));
+                selection.Ex->TextState = TextState_SetCursorIndex(newUnit->Index, 1);
             }
         }
     }
