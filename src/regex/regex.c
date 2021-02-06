@@ -498,6 +498,9 @@ char* toString_SetItem(char* base, SetItem* item) {
         case RE_SETITEM_LITCHAR: {
             base = toString_LitChar(base, &item->LitChar);
         } break;
+        case RE_SETITEM_METACHAR: {
+            base = toString_MetaChar(base, &item->MetaChar);
+        } break;
         case RE_SETITEM_RANGE: {
             base = toString_SetItemRange(base, &item->Range);
         } break;

@@ -26,6 +26,8 @@ int TextState_SelectionStart(TextInputState state);
 int TextState_SelectionEnd(TextInputState state);
 int TextState_IsSelected(TextInputState state, int index);
 
+void TextState_Print(TextInputState state);
+
 typedef struct TextEditResult {
     int DoDelete;
     int DeleteMin;

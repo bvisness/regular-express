@@ -315,7 +315,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                     }
 
                     ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '\\') {
+                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '|') {
                     // pipe
                     NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
                     MoveUnitsTo(
@@ -425,7 +425,7 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
         case RE_CONTENTS_SET: {
             Set* set = contents->Set;
 
-            prepass_Set(set, ex);
+            prepass_Set(set, ex, unit);
 
             // calculate sizes
             Vec2i contentsSize = {0};
@@ -435,6 +435,8 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
 
                 if (item->Type == RE_SETITEM_LITCHAR) {
                     item->Size = (Vec2i) { .w = UNIT_CONTENTS_LITCHAR_WIDTH, .h = UNIT_CONTENTS_MIN_HEIGHT };
+                } else if (item->Type == RE_SETITEM_METACHAR) {
+                    item->Size = (Vec2i) { .w = 25, .h = UNIT_CONTENTS_MIN_HEIGHT };
                 } else if (item->Type == RE_SETITEM_RANGE) {
                     item->Size = (Vec2i) {
                         .w = UNIT_CONTENTS_LITCHAR_WIDTH + SET_DASH_WIDTH + UNIT_CONTENTS_LITCHAR_WIDTH,
@@ -461,38 +463,58 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
     }
 }
 
-void prepass_Set(Set* set, NoUnionEx* ex) {
+void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
     mu_Id muid = mu_get_id_noidstack(ctx, &set, sizeof(Set*));
 
     if (ctx->focus == muid) {
         // Handle keyboard input to set up for next frame
         TextEditResult result = {0};
         int inputTextLength = strlen(ctx->input_text);
-        SetItem* itemBeforeCursor = (set->TextState.InsertIndex > 0
-            ? set->Items[set->TextState.InsertIndex - 1]
-            : NULL
-        );
+        SetItem* itemBeforeCursor = NULL;
+        if (set->TextState.CursorRight) {
+            itemBeforeCursor = set->Items[set->TextState.CursorIndex];
+        } else if (set->TextState.CursorIndex > 0) {
+            itemBeforeCursor = set->Items[set->TextState.CursorIndex - 1];
+        }
 
         if (ctx->key_pressed & MU_KEY_BACKSPACE
                 && itemBeforeCursor
                 && itemBeforeCursor->Type == RE_SETITEM_RANGE
                 && itemBeforeCursor->Range.Max.C != 0
         ) {
+            // clear the end of a range
+            ctx->key_pressed &= ~MU_KEY_BACKSPACE;
             itemBeforeCursor->Range.Max.C = 0;
         } else if (ctx->key_pressed & MU_KEY_BACKSPACE
                 && itemBeforeCursor
                 && itemBeforeCursor->Type == RE_SETITEM_RANGE
                 && itemBeforeCursor->Range.Max.C == 0
         ) {
-            itemBeforeCursor->Type = RE_SETITEM_LITCHAR;
+            // break an incomplete range into a character and a dash
+            ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+            SetItem_SetType(itemBeforeCursor, RE_SETITEM_LITCHAR);
             itemBeforeCursor->LitChar.C = itemBeforeCursor->Range.Min.C;
 
             SetItem* newItem = SetItem_init(RE_NEW(SetItem));
             newItem->LitChar.C = '-';
             Set_AddItem(set, newItem, set->TextState.InsertIndex);
             set->TextState = TextState_BumpCursor(set->TextState, 1, 0);
+        } else if (ctx->key_pressed & MU_KEY_BACKSPACE
+                && itemBeforeCursor
+                && itemBeforeCursor->Type == RE_SETITEM_METACHAR
+        ) {
+            // break the previous metachar
+            ctx->key_pressed &= ~MU_KEY_BACKSPACE;
+            SetItem_SetType(itemBeforeCursor, RE_SETITEM_LITCHAR);
+            itemBeforeCursor->LitChar.C = '\\';
+
+            SetItem* newItem = SetItem_init(RE_NEW(SetItem));
+            newItem->LitChar.C = itemBeforeCursor->MetaChar.C;
+            Set_AddItem(set, newItem, set->TextState.InsertIndex);
+            set->TextState = TextState_BumpCursor(set->TextState, 1, 0);
         } else {
             result = StandardTextInput(ctx, set->TextState, set->NumItems);
+            set->TextState = result.ResultState;
         }
 
         if (result.DoDelete) {
@@ -504,14 +526,13 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
             }
         }
 
-        set->TextState = result.ResultState;
-
         if (result.DoInput) {
             for (int i = 0; i < inputTextLength; i++) {
                 do {
                     if (inputTextLength == 1) {
                         if (ctx->key_down & MU_KEY_ALT && ctx->input_text[i] == ']') {
-                            mu_set_focus(ctx, mu_get_id_noidstack(ctx, &ex, sizeof(NoUnionEx*)));
+                            mu_set_focus(ctx, NoUnionEx_GetID(ex));
+                            ex->TextState = TextState_SetCursorIndex(unit->Index, 1);
                             break;
                         }
 
@@ -520,7 +541,7 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
                             && itemBeforeCursor
                             && itemBeforeCursor->Type != RE_SETITEM_RANGE
                         ) {
-                            itemBeforeCursor->Type = RE_SETITEM_RANGE;
+                            SetItem_SetType(itemBeforeCursor, RE_SETITEM_RANGE);
                             itemBeforeCursor->Range.Min.C = itemBeforeCursor->LitChar.C;
                             break;
                         }
@@ -531,6 +552,17 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
                             && itemBeforeCursor->Range.Max.C == 0
                         ) {
                             itemBeforeCursor->Range.Max.C = ctx->input_text[i];
+                            break;
+                        }
+
+                        if (
+                            itemBeforeCursor
+                            && itemBeforeCursor->Type == RE_SETITEM_LITCHAR
+                            && itemBeforeCursor->LitChar.C == '\\'
+                            && strchr(LEGAL_METACHARS, ctx->input_text[0])
+                        ) {
+                            SetItem_SetType(itemBeforeCursor, RE_SETITEM_METACHAR);
+                            itemBeforeCursor->MetaChar.C = ctx->input_text[0];
                             break;
                         }
                     }
@@ -544,7 +576,7 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
         }
 
         // fix up cursor position
-        set->TextState.InsertIndex = iclamp(set->TextState.InsertIndex, 0, set->NumItems);
+        set->TextState = TextState_Clamp(set->TextState, 0, set->NumItems);
     }
 }
 

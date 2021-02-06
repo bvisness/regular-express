@@ -24,6 +24,7 @@ const char* RE_CONTENTS_ToString(int v);
 
 enum {
     RE_SETITEM_LITCHAR,
+    RE_SETITEM_METACHAR,
     RE_SETITEM_RANGE,
 };
 const char* RE_SETITEM_ToString(int v);
@@ -176,6 +177,7 @@ typedef struct SetItem {
     int Type;
 
     struct LitChar LitChar;
+    struct MetaChar MetaChar;
     struct SetItemRange Range;
 
     Vec2i Size;

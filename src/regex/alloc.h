@@ -45,6 +45,7 @@ Group* Group_init(Group* group);
 Unit* Unit_initWithLiteralChar(Unit* unit, char c);
 
 void UnitContents_SetType(UnitContents* contents, int type);
+void SetItem_SetType(SetItem* item, int type);
 
 void Regex_delete(Regex* regex);
 void NoUnionEx_delete(NoUnionEx* ex);

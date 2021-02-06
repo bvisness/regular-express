@@ -136,6 +136,18 @@ void UnitContents_SetType(UnitContents* contents, int type) {
 	}
 }
 
+void SetItem_SetType(SetItem* item, int type) {
+	item->Type = type;
+	switch (type) {
+		case RE_SETITEM_LITCHAR: {
+			LitChar_init(&item->LitChar);
+		} break;
+		case RE_SETITEM_METACHAR: {
+			MetaChar_init(&item->MetaChar);
+		} break;
+	}
+}
+
 void Regex_delete(Regex* regex) {
 	for (int i = 0; i < regex->NumUnionMembers; i++) {
 		NoUnionEx_delete(regex->UnionMembers[i]);

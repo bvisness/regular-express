@@ -835,6 +835,11 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
             char* str = item->LitChar._buf;
             mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
             draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
+        } else if (item->Type == RE_SETITEM_METACHAR) {
+            mu_layout_set_next(ctx, itemRect, 0);
+            char* str = &item->MetaChar._backslash;
+            mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+            draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
         } else if (item->Type == RE_SETITEM_RANGE) {
             {
                 mu_Rect r = mu_rect(itemX, itemY, UNIT_CONTENTS_LITCHAR_WIDTH, itemRect.h);

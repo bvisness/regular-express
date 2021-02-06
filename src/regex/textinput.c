@@ -144,6 +144,10 @@ int TextState_IsSelected(TextInputState state, int index) {
     return min <= index && index < max;
 }
 
+void TextState_Print(TextInputState state) {
+    printf("Text input state:\n- Insert index: %d\n- Cursor index: %d\n- Cursor right? %d\n- Selection base: %d", state.InsertIndex, state.CursorIndex, state.CursorRight, state.SelectionBase);
+}
+
 TextEditResult TextState_DeleteBackwards(TextInputState state) {
     TextEditResult result = {0};
 
@@ -218,6 +222,8 @@ TextEditResult TextState_InsertString(TextInputState state) {
     result.DoInput = 1;
     result.ResultState = (TextInputState) {
         .InsertIndex = insertAt,
+        .CursorIndex = state.CursorIndex, // these cursor properties don't really matter, but when something else decides to do its own thing with text input instead of just inserting text and manually bumping the cursor, we don't want to lose their original cursor state.
+        .CursorRight = state.CursorRight,
         .SelectionBase = -1,
     };
 
