@@ -45,6 +45,15 @@ TextInputState TextState_SetInsertIndex(TextInputState state, int i, int select)
     return fixupState(result);
 }
 
+TextInputState TextState_SetCursorIndex(int i, int cursorRight) {
+    return (TextInputState) {
+        .InsertIndex = cursorRight ? i + 1 : i,
+        .CursorIndex = i,
+        .CursorRight = cursorRight,
+        .SelectionBase = -1,
+    };
+}
+
 TextInputState TextState_MoveCursor(TextInputState state, int delta, int select) {
     TextInputState result = TextState_SetInsertIndex(state, state.InsertIndex + delta, select);
 

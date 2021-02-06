@@ -1,6 +1,6 @@
 #include "prepass.h"
 
-void prepass_Regex(Regex* regex, NoUnionEx* parentEx) {
+void prepass_Regex(Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
     int w = 0;
     int h = 0;
     int wireHeight = 0;
@@ -25,7 +25,7 @@ void prepass_Regex(Regex* regex, NoUnionEx* parentEx) {
 
     for (int i = 0; i < regex->NumUnionMembers; i++) {
         NoUnionEx* member = regex->UnionMembers[i];
-        prepass_NoUnionEx(member, regex, parentEx);
+        prepass_NoUnionEx(member, regex, parentEx, parentUnit);
 
         w = imax(w, member->Size.w);
         h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + member->Size.h;
@@ -46,8 +46,8 @@ void prepass_Regex(Regex* regex, NoUnionEx* parentEx) {
     regex->WireHeight = wireHeight;
 }
 
-void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
-    mu_Id muid = mu_get_id_noidstack(ctx, &ex, sizeof(NoUnionEx*));
+void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
+    mu_Id muid = NoUnionEx_GetID(ex);
 
     if (ctx->focus == muid) {
         ctx->updated_focus = 1;
@@ -114,6 +114,26 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
             );
             ctx->focus = mu_get_id_noidstack(ctx, &previousEx, sizeof(NoUnionEx*));
             previousEx->TextState.InsertIndex = index;
+        } else if (ctx->key_pressed & MU_KEY_ARROWDOWN) {
+            // Jump down into the group the cursor is on
+            Unit* cursorUnit = ex->Units[ex->TextState.CursorIndex];
+            if (cursorUnit->Contents.Type == RE_CONTENTS_GROUP && !TextState_IsSelecting(ex->TextState)) {
+                NoUnionEx* destEx = cursorUnit->Contents.Group->Regex->UnionMembers[0]; // TODO: Is it possible that there could be no union members here?
+                mu_set_focus(ctx, NoUnionEx_GetID(destEx));
+
+                if (ex->TextState.CursorRight) {
+                    destEx->TextState = TextState_SetInsertIndex(destEx->TextState, destEx->NumUnits, 0);
+                } else {
+                    destEx->TextState = TextState_SetInsertIndex(destEx->TextState, 0, 0);
+                }
+            }
+        } else if (ctx->key_pressed & MU_KEY_ARROWUP) {
+            // Jump up out of the current group
+            if (parentUnit) {
+                mu_set_focus(ctx, NoUnionEx_GetID(parentEx));
+                int doCursorRight = ex->TextState.CursorIndex > (ex->NumUnits / 2);
+                parentEx->TextState = TextState_SetCursorIndex(parentUnit->Index, doCursorRight);
+            }
         } else if (inputTextLength > 1) {
             // assume we are pasting and want to parse a regex
             // TODO: We should probably explicitly detect that we are pasting.
@@ -179,6 +199,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
                     // close paren (leave group)
                     if (parentEx) {
                         mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
+
                     }
                 } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '6') {
                     // caret
@@ -317,7 +338,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx) {
 
 void prepass_Unit(Unit* unit, NoUnionEx* ex) {
     UnitContents* contents = &unit->Contents;
-    prepass_UnitContents(contents, ex);
+    prepass_UnitContents(contents, ex, unit);
 
     int attachmentWidth = Unit_IsNonSingular(unit) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0;
 
@@ -332,7 +353,7 @@ void prepass_Unit(Unit* unit, NoUnionEx* ex) {
     unit->WireHeight = UNIT_REPEAT_WIRE_ZONE_HEIGHT + contents->WireHeight;
 }
 
-void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex) {
+void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
     switch (contents->Type) {
         case RE_CONTENTS_LITCHAR: {
             contents->Size = (Vec2i) { .w = UNIT_CONTENTS_LITCHAR_WIDTH, .h = UNIT_CONTENTS_MIN_HEIGHT };
@@ -381,7 +402,7 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex) {
         } break;
         case RE_CONTENTS_GROUP: {
             Group* group = contents->Group;
-            prepass_Group(group, ex);
+            prepass_Group(group, ex, unit);
             contents->Size = group->Size;
             contents->WireHeight = group->WireHeight;
         }
@@ -475,9 +496,9 @@ void prepass_Set(Set* set, NoUnionEx* ex) {
     }
 }
 
-void prepass_Group(Group* group, NoUnionEx* ex) {
+void prepass_Group(Group* group, NoUnionEx* ex, Unit* unit) {
     Regex* regex = group->Regex;
-    prepass_Regex(regex, ex);
+    prepass_Regex(regex, ex, unit);
 
     group->Size = (Vec2i) {
         .w = regex->Size.w,

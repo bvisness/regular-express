@@ -14,6 +14,7 @@ typedef struct TextInputState {
 extern const TextInputState DEFAULT_TEXT_INPUT_STATE;
 
 TextInputState TextState_SetInsertIndex(TextInputState state, int i, int select);
+TextInputState TextState_SetCursorIndex(int i, int cursorRight);
 TextInputState TextState_MoveCursor(TextInputState state, int delta, int select);
 TextInputState TextState_BumpCursor(TextInputState state, int direction, int select);
 TextInputState TextState_SetCursorRight(TextInputState state, int cursorRight);

@@ -116,8 +116,8 @@ int frame(float dt) {
 	UNDOPUSH(ctx->focus);
 	Regex_PushUndo(regex);
 
-	prepass_Regex(regex, NULL);
-	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL);
+	prepass_Regex(regex, NULL, NULL);
+	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL, NULL);
 
 	if (mu_begin_window_ex(ctx, "Test", mu_rect(WINDOW_PADDING, WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, GUI_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(
