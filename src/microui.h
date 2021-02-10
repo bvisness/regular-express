@@ -114,6 +114,7 @@ enum {
   MU_KEY_DELETE       = (1 << 9),
   MU_KEY_HOME         = (1 << 10),
   MU_KEY_END          = (1 << 11),
+  MU_KEY_TAB          = (1 << 12),
 };
 
 

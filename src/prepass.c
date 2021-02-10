@@ -148,6 +148,22 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
             NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
             mu_set_focus(ctx, NoUnionEx_GetID(previousEx));
             previousEx->TextState = TextState_SetCursorIndex(previousEx->NumUnits - 1, 1);
+        } else if (ctx->key_down & MU_KEY_SHIFT && ctx->key_pressed & MU_KEY_TAB) {
+            // shift-tab
+            ctx->key_pressed &= ~MU_KEY_TAB;
+            if (ex->Index > 0) {
+                NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
+                mu_set_focus(ctx, NoUnionEx_GetID(previousEx));
+                previousEx->TextState = TextState_SetCursorIndex(0, 0);
+            }
+        } else if (ctx->key_pressed & MU_KEY_TAB) {
+            // tab
+            ctx->key_pressed &= ~MU_KEY_TAB;
+            if (ex->Index < regex->NumUnionMembers - 1) {
+                NoUnionEx* nextEx = regex->UnionMembers[ex->Index + 1];
+                mu_set_focus(ctx, NoUnionEx_GetID(nextEx));
+                nextEx->TextState = TextState_SetCursorIndex(0, 0);
+            }
         } else if (ctx->key_down & MU_KEY_ALT && ctx->key_pressed & MU_KEY_ARROWDOWN) {
             ctx->key_pressed &= ~MU_KEY_ARROWDOWN;
             if (ex->Index < regex->NumUnionMembers - 1) {

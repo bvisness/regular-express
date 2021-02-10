@@ -258,6 +258,7 @@
 				// MU_KEY_DELETE       = (1 << 9),
 				// MU_KEY_HOME         = (1 << 10),
 				// MU_KEY_END          = (1 << 11),
+				// MU_KEY_TAB          = (1 << 12),
 
 				if (e.key === 'Shift') {
 					func(1 << 0);
@@ -283,6 +284,8 @@
 					func(1 << 10);
 				} else if (e.key === 'End') {
 					func(1 << 11);
+				} else if (e.key === 'Tab') {
+					func(1 << 12);
 				}
 
 				wakeUp();
