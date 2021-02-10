@@ -87,12 +87,11 @@ void init() {
   	Undo_Reset();
 }
 
-int frame(float dt) {
+int frame(int width, int height, float dt) {
 	mu_begin(ctx, dt);
 
-	const int PAGE_WIDTH = 900;
 	const int WINDOW_PADDING = 10;
-	const int GUI_HEIGHT = 400;
+	const int FINAL_REGEX_HEIGHT = 80;
 
 	if (
 		ctx->key_down & MU_KEY_CTRL
@@ -119,12 +118,14 @@ int frame(float dt) {
 	prepass_Regex(regex, NULL, NULL);
 	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL, NULL);
 
-	if (mu_begin_window_ex(ctx, "Test", mu_rect(WINDOW_PADDING, WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, GUI_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
+	int guiHeight = height - WINDOW_PADDING - FINAL_REGEX_HEIGHT;
+
+	if (mu_begin_window_ex(ctx, "Test", mu_rect(0, 0, width, guiHeight), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(
 			regex,
 			(Vec2i) {
-				.x = PAGE_WIDTH/2 - regex->Size.x/2,
-				.y = WINDOW_PADDING + GUI_HEIGHT/2 - regex->Size.y/2,
+				.x = width/2 - regex->Size.x/2,
+				.y = WINDOW_PADDING + guiHeight/2 - regex->Size.y/2,
 			},
 			0
 		);
@@ -214,7 +215,7 @@ int frame(float dt) {
 		mu_end_window(ctx);
 	}
 
-	if (mu_begin_window(ctx, "Final Regex", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 80))) {
+	if (mu_begin_window(ctx, "Final Regex", mu_rect(WINDOW_PADDING, height - WINDOW_PADDING - FINAL_REGEX_HEIGHT, width - WINDOW_PADDING*2, FINAL_REGEX_HEIGHT))) {
 		mu_layout_row(ctx, 2, (int[]) { 500, -10 }, -1);
 
 		char* regexString = ToString(regex);
@@ -227,11 +228,11 @@ int frame(float dt) {
 		mu_end_window(ctx);
 	}
 
-	if (mu_begin_window(ctx, "Tree View", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, PAGE_WIDTH - WINDOW_PADDING*2, 300))) {
-		doTree(ctx, regex);
+	// if (mu_begin_window(ctx, "Tree View", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, width - WINDOW_PADDING*2, 300))) {
+	// 	doTree(ctx, regex);
 
-		mu_end_window(ctx);
-	}
+	// 	mu_end_window(ctx);
+	// }
 
 	// mouse up; end all drags
 	if (!(ctx->mouse_down & MU_MOUSE_LEFT)) {

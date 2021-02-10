@@ -1,4 +1,6 @@
 #include "regex.h"
+#include "alloc.h"
+#include "../util/math.h"
 #include "../undo.h"
 #include "../globals.h"
 
@@ -112,6 +114,16 @@ Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index) {
 
     unit->Parent = NULL;
     return unit;
+}
+
+void NoUnionEx_RemoveUnits(NoUnionEx* ex, int minIndex, int maxIndex) {
+    minIndex = iclamp(minIndex, 0, ex->NumUnits);
+    maxIndex = iclamp(maxIndex, 0, ex->NumUnits);
+
+    for (int i = 0; i < maxIndex - minIndex; i++) {
+        Unit* deleted = NoUnionEx_RemoveUnit(ex, minIndex);
+        Unit_delete(deleted);
+    }
 }
 
 void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit) {
@@ -324,6 +336,23 @@ const char* Special_GetHumanString(Special* s) {
     }
 
     return str;
+}
+
+char* MetaChar_GetHumanString(MetaChar* m) {
+    switch (m->C) {
+    case 'd': return "digit";
+    case 'D': return "non-digit";
+    case 'w': return "word character";
+    case 'W': return "non-word character";
+    case 's': return "whitespace";
+    case 'S': return "non-whitespace";
+    case 'b': return "word boundary";
+    case 'B': return "non word boundary";
+    case 'n': return "newline";
+    case 't': return "tab";
+    case '0': return "null";
+    default: return &m->_backslash;
+    }
 }
 
 

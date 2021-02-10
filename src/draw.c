@@ -793,10 +793,10 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
             draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
         } break;
         case RE_CONTENTS_METACHAR: {
-            mu_draw_rect(ctx, r, backgroundColor);
+            mu_draw_rect(ctx, r, selected ? backgroundColor : COLOR_METACHAR_BACKGROUND);
 
-            char* str = &contents->MetaChar._backslash;
-            mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, 0);
+            char* str = MetaChar_GetHumanString(&contents->MetaChar);
+            mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
             draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
         } break;
         case RE_CONTENTS_SPECIAL: {
@@ -807,7 +807,6 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
             draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
         } break;
         case RE_CONTENTS_SET: {
-            // TODO: Set
             mu_draw_rect(ctx, r, backgroundColor);
             drawRailroad_Set(contents->Set, origin);
         } break;

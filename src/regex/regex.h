@@ -63,6 +63,7 @@ typedef struct NoUnionEx {
 mu_Id NoUnionEx_GetID(NoUnionEx* ex);
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index);
 struct Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index);
+void NoUnionEx_RemoveUnits(NoUnionEx* ex, int minIndex, int maxIndex);
 void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit);
 void NoUnionEx_PushUndo(NoUnionEx* ex);
 
@@ -80,6 +81,8 @@ typedef struct MetaChar {
         char _buf[2];
     };
 } MetaChar;
+
+char* MetaChar_GetHumanString(MetaChar* m);
 
 typedef struct Special {
     int Type;

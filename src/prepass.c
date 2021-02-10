@@ -222,6 +222,119 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
 
                 mu_set_focus(ctx, NoUnionEx_GetID(newEx));
             }
+        } else if (ctx->key_down & MU_KEY_ALT && inputTextLength == 1) {
+            // Alt-Whatever shortcut
+            Unit* newUnit = NULL;
+            if (ctx->input_text[0] == '[') {
+                if (selectedUnits.Ex) {
+                    DeleteRange(selectedUnits);
+                }
+                newUnit = Unit_init(RE_NEW(Unit));
+                UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
+                mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
+            } else if (ctx->input_text[0] == '(') {
+                // open paren (create group)
+                if (TextState_IsSelecting(ex->TextState)) {
+                    ConvertRangeToGroup(selectedUnits);
+                    ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
+                    ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
+                } else {
+                    newUnit = Unit_init(RE_NEW(Unit));
+                    UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
+                    mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
+                }
+            } else if (ctx->input_text[0] == ')') {
+                // close paren (leave group)
+                if (parentEx) {
+                    mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
+                    parentEx->TextState = TextState_SetCursorIndex(parentUnit->Index, 1);
+                }
+            } else if (ctx->input_text[0] == '.') {
+                newUnit = Unit_init(RE_NEW(Unit));
+                UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+                newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
+            } else if (ctx->input_text[0] == '^') {
+                newUnit = Unit_init(RE_NEW(Unit));
+                UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+                newUnit->Contents.Special.Type = RE_SPECIAL_STRINGSTART;
+            } else if (ctx->input_text[0] == '$') {
+                newUnit = Unit_init(RE_NEW(Unit));
+                UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+                newUnit->Contents.Special.Type = RE_SPECIAL_STRINGEND;
+            } else if (ctx->input_text[0] == '?'
+                        || ctx->input_text[0] == '+'
+                        || ctx->input_text[0] == '*'
+            ) {
+                Unit* repeatUnit = previousUnit;
+                if (selectedUnits.Ex) {
+                    if (selectedUnits.End - selectedUnits.Start > 0) {
+                        ConvertRangeToGroup(selectedUnits);
+                        ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
+                        ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
+                    }
+                    repeatUnit = ex->Units[selectedUnits.Start];
+                }
+
+                switch (ctx->input_text[0]) {
+                case '?': {
+                    if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 1) {
+                        Unit_SetRepeatMin(repeatUnit, 1);
+                        Unit_SetRepeatMax(repeatUnit, 1);
+                    } else {
+                        Unit_SetRepeatMin(repeatUnit, 0);
+                        Unit_SetRepeatMax(repeatUnit, 1);
+                    }
+                } break;
+                case '+': {
+                    if (repeatUnit->RepeatMin == 1 && repeatUnit->RepeatMax == 0) {
+                        Unit_SetRepeatMin(repeatUnit, 1);
+                        Unit_SetRepeatMax(repeatUnit, 1);
+                    } else {
+                        Unit_SetRepeatMin(repeatUnit, 1);
+                        Unit_SetRepeatMax(repeatUnit, 0);
+                    }
+                } break;
+                case '*': {
+                    if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 0) {
+                        Unit_SetRepeatMin(repeatUnit, 1);
+                        Unit_SetRepeatMax(repeatUnit, 1);
+                    } else {
+                        Unit_SetRepeatMin(repeatUnit, 0);
+                        Unit_SetRepeatMax(repeatUnit, 0);
+                    }
+                } break;
+                }
+
+                ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
+            } else if (ctx->input_text[0] == '|') {
+                // pipe
+                NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
+                MoveUnitsTo(
+                    (UnitRange) {
+                        .Ex = ex,
+                        .Start = ex->TextState.InsertIndex,
+                        .End = ex->NumUnits - 1,
+                    },
+                    newEx,
+                    0
+                );
+                Regex_AddUnionMember(regex, newEx, ex->Index + 1);
+
+                mu_set_focus(ctx, NoUnionEx_GetID(newEx));
+            }
+
+            if (newUnit) {
+                if (TextState_IsSelecting(ex->TextState)) {
+                    TextEditResult result = TextState_DeleteForwards(ex->TextState);
+                    NoUnionEx_RemoveUnits(ex, result.DeleteMin, result.DeleteMax);
+                    ex->TextState = result.ResultState;
+                }
+
+                NoUnionEx_AddUnit(ex, newUnit, ex->TextState.InsertIndex);
+                ex->TextState = TextState_MoveCursor(ex->TextState, 1, 0);
+            }
+
+            ctx->input_text[0] = 0;
         } else if (inputTextLength > 1) {
             // assume we are pasting and want to parse a regex
             // TODO: We should probably explicitly detect that we are pasting.
@@ -252,124 +365,17 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
             TextEditResult result = StandardTextInput(ctx, ex->TextState, ex->NumUnits);
 
             if (result.DoDelete) {
-                result.DeleteMin = iclamp(result.DeleteMin, 0, ex->NumUnits);
-                result.DeleteMax = iclamp(result.DeleteMax, 0, ex->NumUnits);
-
-                for (int i = 0; i < result.DeleteMax - result.DeleteMin; i++) {
-                    Unit* deleted = NoUnionEx_RemoveUnit(ex, result.DeleteMin);
-                    Unit_delete(deleted);
-                }
+                NoUnionEx_RemoveUnits(ex, result.DeleteMin, result.DeleteMax);
             }
 
             ex->TextState = result.ResultState;
 
             if (result.DoInput && inputTextLength == 1) {
                 Unit* newUnit = NULL;
-                if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '[') {
-                    if (selectedUnits.Ex) {
-                        DeleteRange(selectedUnits);
-                    }
-                    newUnit = Unit_init(RE_NEW(Unit));
-                    UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
-                    mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '(') {
-                    // open paren (create group)
-                    if (TextState_IsSelecting(ex->TextState)) {
-                        ConvertRangeToGroup(selectedUnits);
-                        ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
-                        ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
-                    } else {
-                        newUnit = Unit_init(RE_NEW(Unit));
-                        UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
-                        mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
-                    }
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == ')') {
-                    // close paren (leave group)
-                    if (parentEx) {
-                        mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
-                        parentEx->TextState = TextState_SetCursorIndex(parentUnit->Index, 1);
-                    }
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '6') {
-                    // caret
-                    newUnit = Unit_init(RE_NEW(Unit));
-                    UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-                    newUnit->Contents.Special.Type = RE_SPECIAL_STRINGSTART;
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '4') {
-                    // dollar sign
-                    newUnit = Unit_init(RE_NEW(Unit));
-                    UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-                    newUnit->Contents.Special.Type = RE_SPECIAL_STRINGEND;
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '.') {
-                    newUnit = Unit_init(RE_NEW(Unit));
-                    UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
-                    newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
-                } else if (
-                    ctx->key_down & MU_KEY_ALT && (
-                        ctx->input_text[0] == '?'
-                        || ctx->input_text[0] == '+'
-                        || ctx->input_text[0] == '*'
-                    )
-                ) {
-                    Unit* repeatUnit = previousUnit;
-                    if (selectedUnits.Ex) {
-                        if (selectedUnits.End - selectedUnits.Start > 0) {
-                            ConvertRangeToGroup(selectedUnits);
-                            ex->TextState = TextState_SetInsertIndex(ex->TextState, selectedUnits.Start + 1, 0);
-                            ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
-                        }
-                        repeatUnit = ex->Units[selectedUnits.Start];
-                    }
-
-                    switch (ctx->input_text[0]) {
-                    case '?': {
-                        if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 1) {
-                            Unit_SetRepeatMin(repeatUnit, 1);
-                            Unit_SetRepeatMax(repeatUnit, 1);
-                        } else {
-                            Unit_SetRepeatMin(repeatUnit, 0);
-                            Unit_SetRepeatMax(repeatUnit, 1);
-                        }
-                    } break;
-                    case '+': {
-                        if (repeatUnit->RepeatMin == 1 && repeatUnit->RepeatMax == 0) {
-                            Unit_SetRepeatMin(repeatUnit, 1);
-                            Unit_SetRepeatMax(repeatUnit, 1);
-                        } else {
-                            Unit_SetRepeatMin(repeatUnit, 1);
-                            Unit_SetRepeatMax(repeatUnit, 0);
-                        }
-                    } break;
-                    case '*': {
-                        if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 0) {
-                            Unit_SetRepeatMin(repeatUnit, 1);
-                            Unit_SetRepeatMax(repeatUnit, 1);
-                        } else {
-                            Unit_SetRepeatMin(repeatUnit, 0);
-                            Unit_SetRepeatMax(repeatUnit, 0);
-                        }
-                    } break;
-                    }
-
-                    ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
-                } else if (ctx->key_down & MU_KEY_ALT && ctx->input_text[0] == '|') {
-                    // pipe
-                    NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
-                    MoveUnitsTo(
-                        (UnitRange) {
-                            .Ex = ex,
-                            .Start = ex->TextState.InsertIndex,
-                            .End = ex->NumUnits - 1,
-                        },
-                        newEx,
-                        0
-                    );
-                    Regex_AddUnionMember(regex, newEx, ex->Index + 1);
-
-                    mu_set_focus(ctx, NoUnionEx_GetID(newEx));
-                } else if (previousUnit
-                            && previousUnit->Contents.Type == RE_CONTENTS_LITCHAR
-                            && previousUnit->Contents.LitChar.C == '\\'
-                            && strchr(LEGAL_METACHARS, ctx->input_text[0])
+                if (previousUnit
+                        && previousUnit->Contents.Type == RE_CONTENTS_LITCHAR
+                        && previousUnit->Contents.LitChar.C == '\\'
+                        && strchr(LEGAL_METACHARS, ctx->input_text[0])
                 ) {
                     // previous unit is a slash, do a metachar
                     Unit* deletedUnit = NoUnionEx_RemoveUnit(ex, previousUnit->Index);
@@ -448,7 +454,10 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
             contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
         } break;
         case RE_CONTENTS_METACHAR: {
-            contents->Size = (Vec2i) { .w = 25, .h = UNIT_CONTENTS_MIN_HEIGHT };
+            char* str = MetaChar_GetHumanString(&contents->MetaChar);
+            int width = measureText(str, strlen(str));
+
+            contents->Size = (Vec2i) { .w = width + 20, .h = UNIT_CONTENTS_MIN_HEIGHT };
             contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
         } break;
         case RE_CONTENTS_SPECIAL: {

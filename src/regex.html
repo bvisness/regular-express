@@ -365,7 +365,7 @@
 				}
 
 				const currentTime = new Date().getTime() / 1000;
-				const animating = test.exports.frame(currentTime - lastTime);
+				const animating = test.exports.frame(canvas.width / dpr, canvas.height / dpr, currentTime - lastTime);
 
 				lastTime = currentTime;
 

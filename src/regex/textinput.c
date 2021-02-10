@@ -264,14 +264,9 @@ TextEditResult StandardTextInput(mu_Context* ctx, TextInputState textState, int 
             .ResultState = TextState_SelectRange(0, maxIndex),
         };
     } else if (
-        ctx->key_down & (MU_KEY_CTRL | MU_KEY_ALT)
-        && ctx->input_text[0] != 0
+        ctx->input_text[0] != 0
+        && !(ctx->key_down & (MU_KEY_CTRL | MU_KEY_ALT))
     ) {
-        result = (TextEditResult) {
-            .DoInput = 1,
-            .ResultState = textState,
-        };
-    } else if (ctx->input_text[0] != 0) {
         result = TextState_InsertString(textState);
     } else {
         result = (TextEditResult) { .ResultState = textState };
