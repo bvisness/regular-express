@@ -44,6 +44,7 @@ extern void copyText(char* text);
 #define CURSOR_VERTICAL_PADDING 2
 
 #define COLOR_RE_TEXT (mu_Color) { 0, 0, 0, 255 }
+#define COLOR_RE_TEXT_DIM (mu_Color) { 140, 140, 140, 255 }
 #define COLOR_WIRE (mu_Color) { 50, 50, 50, 255 }
 #define COLOR_CURSOR (mu_Color) { 45, 83, 252, 255 }
 #define COLOR_UNIT_BACKGROUND (mu_Color) { 200, 200, 200, 255 }

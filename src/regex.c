@@ -72,17 +72,21 @@ Regex* regex;
 
 void init() {
 	regex = Regex_init(RE_NEW(Regex));
+	NoUnionEx* ex = regex->UnionMembers[0];
 
 	const char* initialString = "Hello";
 	for (int i = 0; i < strlen(initialString); i++) {
 		Unit* unit = Unit_initWithLiteralChar(RE_NEW(Unit), *(initialString + i));
-		NoUnionEx_AddUnit(regex->UnionMembers[0], unit, -1);
+		NoUnionEx_AddUnit(ex, unit, -1);
 	}
 
 	ctx = malloc(sizeof(mu_Context));
 	mu_init(ctx);
 	ctx->text_width = text_width;
   	ctx->text_height = text_height;
+
+  	mu_set_focus(ctx, NoUnionEx_GetID(ex));
+  	ex->TextState = TextState_SetInsertIndex(ex->TextState, ex->NumUnits, 0);
 
   	Undo_Reset();
 }

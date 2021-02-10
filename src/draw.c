@@ -788,9 +788,17 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
         case RE_CONTENTS_LITCHAR: {
             mu_draw_rect(ctx, r, backgroundColor);
 
-            char* str = contents->LitChar._buf;
-            mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
-            draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
+            if (contents->LitChar.C == ' ') {
+                // spaces get special treatment
+                mu_draw_rect(ctx,
+                    mu_rect(origin.x + 3, origin.y + contents->Size.h - 4, contents->Size.w - 6, 1),
+                    COLOR_RE_TEXT_DIM
+                );
+            } else {
+                char* str = contents->LitChar._buf;
+                mu_Vec2 pos = mu_position_text(ctx, str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+                draw_arbitrary_text(ctx, str, pos, COLOR_RE_TEXT);
+            }
         } break;
         case RE_CONTENTS_METACHAR: {
             mu_draw_rect(ctx, r, selected ? backgroundColor : COLOR_METACHAR_BACKGROUND);
