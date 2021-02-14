@@ -357,6 +357,13 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
             // assume we are pasting and want to parse a regex
             // TODO: We should probably explicitly detect that we are pasting.
 
+            if (TextState_IsSelecting(ex->TextState)) {
+                int start = TextState_SelectionStart(ex->TextState);
+                int end = TextState_SelectionEnd(ex->TextState);
+                NoUnionEx_RemoveUnits(ex, start, end + 1);
+                ex->TextState = TextState_SetInsertIndex(ex->TextState, start, 0);
+            }
+
             Regex* parseResult = parse(ctx->input_text);
             ctx->input_text[0] = 0;
 
