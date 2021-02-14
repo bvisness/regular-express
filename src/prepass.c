@@ -648,12 +648,18 @@ void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
 }
 
 void prepass_Group(Group* group, NoUnionEx* ex, Unit* unit) {
-    Regex* regex = group->Regex;
-    prepass_Regex(regex, ex, unit);
+    if (Group_CanRender(group)) {
+        Regex* regex = group->Regex;
+        prepass_Regex(regex, ex, unit);
 
-    group->Size = (Vec2i) {
-        .w = regex->Size.w,
-        .h = GROUP_VERTICAL_PADDING + regex->Size.h + GROUP_VERTICAL_PADDING,
-    };
-    group->WireHeight = GROUP_VERTICAL_PADDING + regex->WireHeight;
+        group->Size = (Vec2i) {
+            .w = regex->Size.w,
+            .h = GROUP_VERTICAL_PADDING + regex->Size.h + GROUP_VERTICAL_PADDING,
+        };
+        group->WireHeight = GROUP_VERTICAL_PADDING + regex->WireHeight;
+    } else {
+        int width = measureText(UNKNOWN_CONSTRUCT_TEXT, strlen(UNKNOWN_CONSTRUCT_TEXT));
+        group->Size = (Vec2i) { .w = width + 20, .h = UNIT_CONTENTS_MIN_HEIGHT };
+        group->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
+    }
 }

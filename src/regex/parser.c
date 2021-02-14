@@ -31,6 +31,67 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
             break;
         } else if (c == '(') {
             (*i)++;
+
+            int groupType = RE_GROUP_NORMAL;
+            int groupNameStart = 0;
+            int groupNameLength = 0;
+
+            if (regexStr[*i] == '?') {
+                (*i)++;
+
+                /*
+                ?=          positive lookahead
+                ?!          negative lookahead
+                ?<=         positive lookbehind
+                ?<!         negative lookbehind
+                ?:          non-capturing group
+                ?<name>     named group
+                */
+
+                switch (regexStr[*i]) {
+                case '=': {
+                    // positive lookahead
+                    groupType = RE_GROUP_POSITIVE_LOOKAHEAD;
+                } break;
+                case '!': {
+                    // negative lookahead
+                    groupType = RE_GROUP_NEGATIVE_LOOKAHEAD;
+                } break;
+                case '<': {
+                    // lookbehinds, or named group
+                    (*i)++;
+
+                    switch (regexStr[*i]) {
+                    case '=': {
+                        // positive lookbehind
+                        groupType = RE_GROUP_POSITIVE_LOOKBEHIND;
+                    } break;
+                    case '!': {
+                        // negative lookbehind
+                        groupType = RE_GROUP_NEGATIVE_LOOKBEHIND;
+                    } break;
+                    default: {
+                        // named group!
+                        // for now, assume that the first occurrence of > is the end, screw escaping
+                        groupType = RE_GROUP_NAMED;
+
+                        groupNameStart = *i;
+                        while (regexStr[*i] != '>') {
+                            (*i)++;
+                            groupNameLength++;
+                        }
+                    } break;
+                    }
+                } break;
+                case ':': {
+                    // non-capturing group
+                    groupType = RE_GROUP_NON_CAPTURING;
+                } break;
+                }
+
+                (*i)++;
+            }
+
             Regex* groupRegex = parseRegex(regexStr, i, len);
 
             Unit* newUnit = Unit_init(RE_NEW(Unit));
@@ -41,6 +102,13 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
             Regex_delete(newUnit->Contents.Group->Regex);
 
             newUnit->Contents.Group->Regex = groupRegex;
+            newUnit->Contents.Group->Type = groupType;
+
+            if (groupType == RE_GROUP_NAMED) {
+                memcpy(newUnit->Contents.Group->Name, &regexStr[groupNameStart], groupNameLength);
+                newUnit->Contents.Group->Name[groupNameLength] = 0;
+            }
+
             NoUnionEx_AddUnit(ex, newUnit, -1);
         } else if (c == '|') {
             // TODO: Maybe this should use a helper method on NoUnionEx

@@ -923,19 +923,27 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
 }
 
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected) {
-    mu_draw_rounded_rect(
-        ctx,
-        mu_rect(origin.x, origin.y, group->Size.w, group->Size.h),
-        selected ? COLOR_SELECTED_BACKGROUND : mu_color(0, 0, 0, 25),
-        4
-    );
+    mu_Rect r = mu_rect(origin.x, origin.y, group->Size.w, group->Size.h);
 
-    drawRailroad_Regex(
-        group->Regex,
-        (Vec2i) {
-            .x = origin.x,
-            .y = GROUP_VERTICAL_PADDING + origin.y,
-        },
-        unitDepth + 1
-    );
+    if (Group_CanRender(group)) {
+        mu_draw_rounded_rect(
+            ctx,
+            r,
+            selected ? COLOR_SELECTED_BACKGROUND : mu_color(0, 0, 0, 25),
+            4
+        );
+
+        drawRailroad_Regex(
+            group->Regex,
+            (Vec2i) {
+                .x = origin.x,
+                .y = GROUP_VERTICAL_PADDING + origin.y,
+            },
+            unitDepth + 1
+        );
+    } else {
+        mu_draw_rect(ctx, r, selected ? COLOR_SELECTED_BACKGROUND : COLOR_UNKNOWN_CONSTRUCT_BACKGROUND);
+        mu_Vec2 pos = mu_position_text(ctx, UNKNOWN_CONSTRUCT_TEXT, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+        draw_arbitrary_text(ctx, UNKNOWN_CONSTRUCT_TEXT, pos, COLOR_RE_TEXT);
+    }
 }

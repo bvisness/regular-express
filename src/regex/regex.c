@@ -262,6 +262,14 @@ void Group_PushUndo(Group* group) {
     Regex_PushUndo(group->Regex);
 }
 
+int Group_CanRender(Group* group) {
+    if (group->Type == RE_GROUP_NORMAL) {
+        return 1;
+    }
+
+    return 0;
+}
+
 mu_Id Set_GetID(Set* set) {
     return mu_get_id_noidstack(ctx, &set, sizeof(Set*));
 }
@@ -406,7 +414,7 @@ char* ToString(Regex* regex) {
     return toStringBuf;
 }
 
-char* writeLiteral(char* base, const char* literal) {
+char* writeString(char* base, char* literal) {
     size_t len = strlen(literal);
     memcpy(base, literal, len);
     return base + len;
@@ -419,7 +427,7 @@ char* toString_Regex(char* base, Regex* regex) {
 
     for (int i = 0; i < regex->NumUnionMembers; i++) {
         if (i > 0) {
-            base = writeLiteral(base, "|");
+            base = writeString(base, "|");
         }
         base = toString_NoUnionEx(base, regex->UnionMembers[i]);
     }
@@ -449,19 +457,19 @@ char* toString_Unit(char* base, Unit* unit) {
     if (unit->RepeatMin == 1 && unit->RepeatMax == 1) {
         // do nothing, this is the default
     } else if (unit->RepeatMin == 0 && unit->RepeatMax == 0) {
-        base = writeLiteral(base, "*");
+        base = writeString(base, "*");
     } else if (unit->RepeatMin == 1 && unit->RepeatMax == 0) {
-        base = writeLiteral(base, "+");
+        base = writeString(base, "+");
     } else if (unit->RepeatMin == 0 && unit->RepeatMax == 1) {
-        base = writeLiteral(base, "?");
+        base = writeString(base, "?");
     } else {
-        base = writeLiteral(base, "{");
+        base = writeString(base, "{");
         base += sprintf(base, "%d", unit->RepeatMin);
-        base = writeLiteral(base, ",");
+        base = writeString(base, ",");
         if (unit->RepeatMax >= 0) {
             base += sprintf(base, "%d", unit->RepeatMax);
         }
-        base = writeLiteral(base, "}");
+        base = writeString(base, "}");
     }
 
     return base;
@@ -498,9 +506,33 @@ char* toString_Group(char* base, Group* group) {
         return base;
     }
 
-    base = writeLiteral(base, "(");
+    base = writeString(base, "(");
+
+    switch (group->Type) {
+    case RE_GROUP_NON_CAPTURING: {
+        base = writeString(base, "?:");
+    } break;
+    case RE_GROUP_NAMED: {
+        base = writeString(base, "?<");
+        base = writeString(base, group->Name);
+        base = writeString(base, ">");
+    } break;
+    case RE_GROUP_POSITIVE_LOOKAHEAD: {
+        base = writeString(base, "?=");
+    } break;
+    case RE_GROUP_NEGATIVE_LOOKAHEAD: {
+        base = writeString(base, "?!");
+    } break;
+    case RE_GROUP_POSITIVE_LOOKBEHIND: {
+        base = writeString(base, "?<=");
+    } break;
+    case RE_GROUP_NEGATIVE_LOOKBEHIND: {
+        base = writeString(base, "?<!");
+    } break;
+    }
+
     base = toString_Regex(base, group->Regex);
-    base = writeLiteral(base, ")");
+    base = writeString(base, ")");
 
     return base;
 }
@@ -510,14 +542,14 @@ char* toString_Set(char* base, Set* set) {
         return base;
     }
 
-    base = writeLiteral(base, "[");
+    base = writeString(base, "[");
     if (set->IsNegative) {
-        base = writeLiteral(base, "^");
+        base = writeString(base, "^");
     }
     for (int i = 0; i < set->NumItems; i++) {
         base = toString_SetItem(base, set->Items[i]);
     }
-    base = writeLiteral(base, "]");
+    base = writeString(base, "]");
 
     return base;
 }
@@ -548,7 +580,7 @@ char* toString_SetItemRange(char* base, SetItemRange* range) {
     }
 
     base = toString_LitChar(base, &range->Min);
-    base = writeLiteral(base, "-");
+    base = writeString(base, "-");
     base = toString_LitChar(base, &range->Max);
 
     return base;
@@ -561,13 +593,13 @@ char* toString_Special(char* base, Special* special) {
 
     switch (special->Type) {
         case RE_SPECIAL_ANY: {
-            base = writeLiteral(base, ".");
+            base = writeString(base, ".");
         } break;
         case RE_SPECIAL_STRINGSTART: {
-            base = writeLiteral(base, "^");
+            base = writeString(base, "^");
         } break;
         case RE_SPECIAL_STRINGEND: {
-            base = writeLiteral(base, "$");
+            base = writeString(base, "$");
         } break;
     }
 
@@ -581,7 +613,7 @@ char* toString_LitChar(char* base, LitChar* c) {
 
     if (c->C == 0) {
         // Actual null character, escape dat
-        base = writeLiteral(base, "\\0");
+        base = writeString(base, "\\0");
         return base;
     }
 
@@ -605,7 +637,7 @@ char* toString_MetaChar(char* base, MetaChar* c) {
         return base;
     }
 
-    base = writeLiteral(base, "\\");
+    base = writeString(base, "\\");
 
     *base = c->C;
     base++;

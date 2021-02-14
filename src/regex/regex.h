@@ -35,6 +35,16 @@ enum {
     RE_SPECIAL_STRINGEND,
 };
 
+enum {
+    RE_GROUP_NORMAL,
+    RE_GROUP_NON_CAPTURING,
+    RE_GROUP_NAMED,
+    RE_GROUP_POSITIVE_LOOKAHEAD,
+    RE_GROUP_NEGATIVE_LOOKAHEAD,
+    RE_GROUP_POSITIVE_LOOKBEHIND,
+    RE_GROUP_NEGATIVE_LOOKBEHIND,
+};
+
 typedef struct Regex Regex;
 struct Regex {
     int NumUnionMembers;
@@ -148,14 +158,17 @@ int Unit_ShouldShowRightHandle(Unit* unit);
 void Unit_PushUndo(Unit* unit);
 
 typedef struct Group {
+    int Type;
     struct Regex* Regex;
-    // more properties eventually, like names
+
+    char Name[128];
 
     Vec2i Size;
     int WireHeight;
 } Group;
 
 void Group_PushUndo(Group* group);
+int Group_CanRender(Group* group);
 
 typedef struct Set {
     int NumItems;
