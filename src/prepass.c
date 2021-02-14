@@ -1,6 +1,8 @@
 #include "prepass.h"
 
 void prepass_Regex(Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
+    assert(regex != NULL);
+
     int w = 0;
     int h = 0;
     int wireHeight = 0;
@@ -356,6 +358,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
             // TODO: We should probably explicitly detect that we are pasting.
 
             Regex* parseResult = parse(ctx->input_text);
+            ctx->input_text[0] = 0;
 
             if (parseResult->NumUnionMembers == 1) {
                 // can insert all units inline
@@ -365,6 +368,9 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                     NoUnionEx_AddUnit(ex, unit, ex->TextState.InsertIndex);
                     ex->TextState = TextState_BumpCursor(ex->TextState, 1, 0);
                 }
+
+                assert(parseResult->UnionMembers[0]->NumUnits == 0);
+                Regex_delete(parseResult);
             } else {
                 // must create a group
                 Unit* newUnit = Unit_init(RE_NEW(Unit));
@@ -372,9 +378,8 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 newUnit->Contents.Group->Regex = parseResult;
 
                 NoUnionEx_AddUnit(ex, newUnit, ex->TextState.InsertIndex);
+                ex->TextState = TextState_BumpCursor(ex->TextState, 1, 0);
             }
-
-            Regex_delete(parseResult);
         } else {
             // type a single key
 

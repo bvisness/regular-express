@@ -75,6 +75,9 @@ void pool_free(Pool *p, void *ptr) {
 
     p->count--;
 
+    // zero the memory
+    // memset(ptr, 0, p->chunk_size);
+
     // Push free node
     node = (PoolFreeNode *)ptr;
     node->next = p->head;
