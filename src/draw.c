@@ -821,6 +821,11 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
         case RE_CONTENTS_GROUP: {
             drawRailroad_Group(contents->Group, origin, unitDepth, selected);
         } break;
+        case RE_CONTENTS_UNKNOWN: {
+            mu_draw_rect(ctx, r, selected ? backgroundColor : COLOR_UNKNOWN_CONSTRUCT_BACKGROUND);
+            mu_Vec2 pos = mu_position_text(ctx, contents->Unknown.Str, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
+            draw_arbitrary_text(ctx, contents->Unknown.Str, pos, COLOR_RE_TEXT);
+        } break;
     }
 }
 

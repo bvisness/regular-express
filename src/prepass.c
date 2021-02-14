@@ -520,7 +520,12 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
             prepass_Group(group, ex, unit);
             contents->Size = group->Size;
             contents->WireHeight = group->WireHeight;
-        }
+        } break;
+        case RE_CONTENTS_UNKNOWN: {
+            int width = measureText(contents->Unknown.Str, strlen(contents->Unknown.Str));
+            contents->Size = (Vec2i) { .w = width + 20, .h = UNIT_CONTENTS_MIN_HEIGHT };
+            contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
+        } break;
     }
 }
 

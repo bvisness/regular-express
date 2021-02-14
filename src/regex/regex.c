@@ -356,8 +356,11 @@ char* MetaChar_GetHumanString(MetaChar* m) {
     case 'S': return "non-whitespace";
     case 'b': return "word boundary";
     case 'B': return "non word boundary";
+    case 'f': return "formfeed page break";
     case 'n': return "newline";
+    case 'r': return "carriage return";
     case 't': return "tab";
+    case 'v': return "vertical tab";
     case '0': return "null";
     default: return &m->_backslash;
     }
@@ -375,6 +378,7 @@ char* toString_SetItemRange(char* base, SetItemRange* range);
 char* toString_Special(char* base, Special* special);
 char* toString_LitChar(char* base, LitChar* c);
 char* toString_MetaChar(char* base, MetaChar* c);
+char* toString_UnknownContents(char* base, UnknownContents* c);
 
 /*
 Enum Functions
@@ -495,6 +499,9 @@ char* toString_UnitContents(char* base, UnitContents* contents) {
         } break;
         case RE_CONTENTS_METACHAR: {
             base = toString_MetaChar(base, &contents->MetaChar);
+        } break;
+        case RE_CONTENTS_UNKNOWN: {
+            base = toString_UnknownContents(base, &contents->Unknown);
         } break;
     }
 
@@ -641,6 +648,16 @@ char* toString_MetaChar(char* base, MetaChar* c) {
 
     *base = c->C;
     base++;
+
+    return base;
+}
+
+char* toString_UnknownContents(char* base, UnknownContents* c) {
+    if (c == NULL) {
+        return base;
+    }
+
+    base = writeString(base, c->Str);
 
     return base;
 }

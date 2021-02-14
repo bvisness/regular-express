@@ -2,6 +2,7 @@
 
 #include "parser.h"
 #include "alloc.h"
+#include "../globals.h"
 
 Unit* parseSet(char* regexStr, int* i, int len);
 Regex* parseRegex(char* regexStr, int* i, int len);
@@ -134,6 +135,75 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
             Unit* lastUnit = ex->Units[ex->NumUnits - 1];
             Unit_SetRepeatMin(lastUnit, 0);
             Unit_SetRepeatMax(lastUnit, 1);
+        } else if (c == '^') {
+            Unit* newUnit = Unit_init(RE_NEW(Unit));
+            UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+            newUnit->Contents.Special.Type = RE_SPECIAL_STRINGSTART;
+            NoUnionEx_AddUnit(ex, newUnit, -1);
+        } else if (c == '$') {
+            Unit* newUnit = Unit_init(RE_NEW(Unit));
+            UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+            newUnit->Contents.Special.Type = RE_SPECIAL_STRINGEND;
+            NoUnionEx_AddUnit(ex, newUnit, -1);
+        } else if (c == '.') {
+            Unit* newUnit = Unit_init(RE_NEW(Unit));
+            UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+            newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
+            NoUnionEx_AddUnit(ex, newUnit, -1);
+        } else if (c == '\\') {
+            // escape sequence
+            int unknownContentStart = *i;
+            int unknownContentLength = 0;
+
+            (*i)++;
+
+            Unit* newUnit = NULL;
+            switch (regexStr[*i]) {
+            case 'u': {
+                // unicode escape sequence (\uHHHH or \u{HHH_HH...})
+                if (regexStr[*i + 1] == '{') {
+                    // weirdo long syntax I guess
+                    unknownContentLength = 2;
+                    while (regexStr[*i] != '}') {
+                        (*i)++;
+                        unknownContentLength++;
+                    }
+                } else {
+                    unknownContentLength = 6;
+                    (*i) += 4;
+                }
+            } break;
+            case 'x': {
+                // character by hex code (\xHH)
+                unknownContentLength = 4;
+                (*i) += 2;
+            } break;
+            case 'c': {
+                // control character by hex code (\cH)
+                unknownContentLength = 3;
+                (*i) += 1;
+            } break;
+            default:
+                // literal char...or maybe metachar
+                if (strchr(LEGAL_METACHARS, regexStr[*i])) {
+                    // metachar
+                    newUnit = Unit_init(RE_NEW(Unit));
+                    UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+                    newUnit->Contents.MetaChar.C = regexStr[*i];
+                } else {
+                    newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), regexStr[*i]);
+                }
+            }
+
+            if (!newUnit) {
+                // I guess it's unknown huh
+                newUnit = Unit_init(RE_NEW(Unit));
+                UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_UNKNOWN);
+                memcpy(newUnit->Contents.Unknown.Str, &regexStr[unknownContentStart], unknownContentLength);
+                newUnit->Contents.Unknown.Str[unknownContentLength] = 0;
+            }
+
+            NoUnionEx_AddUnit(ex, newUnit, -1);
         } else {
             Unit* newUnit = Unit_initWithLiteralChar(RE_NEW(Unit), c);
             NoUnionEx_AddUnit(ex, newUnit, -1);

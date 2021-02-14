@@ -12,6 +12,7 @@
 #define MAX_UNITS 256
 #define MAX_SET_ITEMS 256
 #define MAX_UNIT_CHARS 256
+#define MAX_UNKNOWN_CONTENT_CHARS 32
 
 enum {
     RE_CONTENTS_LITCHAR,
@@ -19,6 +20,7 @@ enum {
     RE_CONTENTS_SPECIAL,
     RE_CONTENTS_SET,
     RE_CONTENTS_GROUP,
+    RE_CONTENTS_UNKNOWN,
 };
 const char* RE_CONTENTS_ToString(int v);
 
@@ -100,6 +102,10 @@ typedef struct Special {
 
 const char* Special_GetHumanString(Special* s);
 
+typedef struct UnknownContents {
+    char Str[MAX_UNKNOWN_CONTENT_CHARS];
+} UnknownContents;
+
 typedef struct UnitContents {
     int Type;
 
@@ -108,6 +114,7 @@ typedef struct UnitContents {
     struct Special Special;
     struct Set* Set;
     struct Group* Group;
+    struct UnknownContents Unknown;
 
     Vec2i Size;
     int WireHeight;
