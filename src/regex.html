@@ -166,6 +166,8 @@
 		let dpr;
 		let textHeight;
 
+		const defaultInitialRegex = 'Hello';
+
 		async function init() {
 			const mem = new WebAssembly.Memory({
 				initial: 256,
@@ -457,6 +459,13 @@
 				wakeUp();
 			});
 
+			window.addEventListener('beforeunload', e => {
+				if (window.localStorage.getItem('outputRegex') != defaultInitialRegex) {
+					e.preventDefault();
+					e.returnValue = 'whatever dude';
+				}
+			});
+
 			function updateCanvasSize() {
 				dpr = window.devicePixelRatio;
 				canvas.width = canvasContainer.getBoundingClientRect().width * dpr;
@@ -474,7 +483,8 @@
 
 			putString(
 				test.exports.initialRegexBuf,
-				window.localStorage.getItem('outputRegex') || 'Hello'
+				// window.localStorage.getItem('outputRegex') || 'Hello'
+				defaultInitialRegex
 			);
 			test.exports.init();
 
