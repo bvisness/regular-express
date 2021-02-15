@@ -70,6 +70,18 @@ void blur() {
 
 Regex* regex;
 
+int mu_auto_width_button(mu_Context* ctx, const char* str, int padding) {
+	mu_layout_width(ctx, measureText(str, strlen(str)) + (2 * padding));
+	return mu_button(ctx, str);
+}
+
+void insertNewUnit(NoUnionEx* ex, Unit* unit) {
+	NoUnionEx_RemoveSelection(ex);
+	NoUnionEx_AddUnit(ex, unit, ex->TextState.InsertIndex);
+	ex->TextState = TextState_BumpCursor(ex->TextState, 1, 0);
+	mu_set_focus(ctx, NoUnionEx_GetID(ex));
+}
+
 void init() {
 	regex = Regex_init(RE_NEW(Regex));
 	NoUnionEx* ex = regex->UnionMembers[0];
@@ -84,6 +96,8 @@ void init() {
 	mu_init(ctx);
 	ctx->text_width = text_width;
   	ctx->text_height = text_height;
+  	// ctx->style->padding = 0;
+  	ctx->style->spacing = 6;
 
   	mu_set_focus(ctx, NoUnionEx_GetID(ex));
   	ex->TextState = TextState_SetInsertIndex(ex->TextState, ex->NumUnits, 0);
@@ -91,11 +105,11 @@ void init() {
   	Undo_Reset();
 }
 
-int frame(int width, int height, float dt) {
+int frame(int width, int height, int contentWidth, float dt) {
 	mu_begin(ctx, dt);
 
 	const int WINDOW_PADDING = 10;
-	const int FINAL_REGEX_HEIGHT = 80;
+	const int TOOLBAR_HEIGHT = 40;
 
 	if (
 		ctx->key_down & MU_KEY_CTRL
@@ -122,14 +136,16 @@ int frame(int width, int height, float dt) {
 	prepass_Regex(regex, NULL, NULL);
 	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL, NULL);
 
-	int guiHeight = height - WINDOW_PADDING - FINAL_REGEX_HEIGHT;
+	int guiHeight = height - WINDOW_PADDING - TOOLBAR_HEIGHT;
+	int windowX = 0;
+	int windowY = TOOLBAR_HEIGHT;
 
-	if (mu_begin_window_ex(ctx, "Test", mu_rect(0, 0, width, guiHeight), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
+	if (mu_begin_window_ex(ctx, "UI", mu_rect(windowX, windowY, width, guiHeight), MU_OPT_NOFRAME | MU_OPT_NOTITLE)) {
 		drawRailroad_Regex(
 			regex,
 			(Vec2i) {
-				.x = width/2 - regex->Size.x/2,
-				.y = WINDOW_PADDING + guiHeight/2 - regex->Size.y/2,
+				.x = windowX + width/2 - regex->Size.x/2,
+				.y = windowY + WINDOW_PADDING + guiHeight/2 - regex->Size.y/2,
 			},
 			0
 		);
@@ -219,18 +235,154 @@ int frame(int width, int height, float dt) {
 		mu_end_window(ctx);
 	}
 
-	if (mu_begin_window(ctx, "Final Regex", mu_rect(WINDOW_PADDING, height - WINDOW_PADDING - FINAL_REGEX_HEIGHT, width - WINDOW_PADDING*2, FINAL_REGEX_HEIGHT))) {
-		mu_layout_row(ctx, 2, (int[]) { 500, -10 }, -1);
+	int toolbarX = (width - contentWidth) / 2;
 
-		char* regexString = ToString(regex);
-		mu_label(ctx, regexString);
+	if (mu_begin_window_ex(ctx, "Toolbar", mu_rect(toolbarX, 0, width, TOOLBAR_HEIGHT), MU_OPT_NOFRAME | MU_OPT_NOTITLE | MU_OPT_NOSCROLL)) {
+		mu_layout_row(ctx, 0, NULL, -1);
 
-		if (mu_button(ctx, "Copy")) {
-			copyText(regexString);
+		if (mu_auto_width_button(ctx, "Character Set", 10)) {
+			Unit* newUnit = Unit_init(RE_NEW(Unit));
+			UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
+			Set* newSet = newUnit->Contents.Set;
+
+			SetItem* lowercase = SetItem_init(RE_NEW(SetItem));
+			SetItem_MakeRange(lowercase, 'a', 'z');
+			Set_AddItem(newSet, lowercase, -1);
+
+			NoUnionEx_RemoveSelection(lastFocusedEx);
+			NoUnionEx_AddUnit(lastFocusedEx, newUnit, lastFocusedEx->TextState.InsertIndex);
+			lastFocusedEx->TextState = TextState_BumpCursor(lastFocusedEx->TextState, 1, 0);
+
+			newSet->TextState = TextState_SetInsertIndex(newSet->TextState, 1, 0);
+			mu_set_focus(ctx, Set_GetID(newSet));
+		}
+
+		if (mu_auto_width_button(ctx, "Group", 10)) {
+			Unit* newUnit = Unit_init(RE_NEW(Unit));
+			UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
+
+			NoUnionEx_RemoveSelection(lastFocusedEx);
+			NoUnionEx_AddUnit(lastFocusedEx, newUnit, lastFocusedEx->TextState.InsertIndex);
+			lastFocusedEx->TextState = TextState_BumpCursor(lastFocusedEx->TextState, 1, 0);
+
+			mu_set_focus(ctx, NoUnionEx_GetID(newUnit->Contents.Group->Regex->UnionMembers[0]));
+		}
+
+		if (mu_auto_width_button(ctx, "Special Character", 10)) {
+			mu_open_popup(ctx, "Specials");
+		}
+
+		if (mu_auto_width_button(ctx, "Common Sets", 10)) {
+			mu_open_popup(ctx, "Common Sets");
+		}
+
+		if (mu_begin_popup(ctx, "Specials")) {
+			int buttonWidth = 130;
+			int buttonHeight = 20;
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "any character")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+				newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "start of string")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+				newUnit->Contents.Special.Type = RE_SPECIAL_STRINGSTART;
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "end of string")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
+				newUnit->Contents.Special.Type = RE_SPECIAL_STRINGEND;
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "word boundary")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 'b';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "non-word-boundary")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 'B';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_end_popup(ctx);
+		}
+
+		if (mu_begin_popup(ctx, "Common Sets")) {
+			int buttonWidth = 130;
+			int buttonHeight = 20;
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "digit")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 'd';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "non-digit")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 'D';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "whitespace")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 's';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "non-whitespace")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 'S';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "word character")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 'w';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_layout_row(ctx, 1, (int[]){ buttonWidth }, buttonHeight);
+			if (mu_button(ctx, "non-word character")) {
+				Unit* newUnit = Unit_init(RE_NEW(Unit));
+				UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_METACHAR);
+				newUnit->Contents.MetaChar.C = 'W';
+				insertNewUnit(lastFocusedEx, newUnit);
+			}
+
+			mu_end_popup(ctx);
 		}
 
 		mu_end_window(ctx);
 	}
+
+	char* outputRegex = ToString(regex);
+	setOutput(outputRegex);
 
 	// if (mu_begin_window(ctx, "Tree View", mu_rect(WINDOW_PADDING, WINDOW_PADDING + GUI_HEIGHT + WINDOW_PADDING + 80 + WINDOW_PADDING, width - WINDOW_PADDING*2, 300))) {
 	// 	doTree(ctx, regex);

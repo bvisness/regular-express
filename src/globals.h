@@ -1,6 +1,7 @@
 #pragma once
 
 #include "microui.h"
+#include "regex/regex.h"
 
 #ifdef MAIN_IMPL
 #define GLOBAL
@@ -21,7 +22,7 @@ extern void canvas_text(char* str, int x, int y, COLORPARAMS);
 extern void canvas_line(int x1, int y1, int x2, int y2, COLORPARAMS, int strokeWidth);
 extern void canvas_arc(int x, int y, int radius, float angleStart, float angleEnd, COLORPARAMS, int strokeWidth);
 
-extern void copyText(char* text);
+extern void setOutput(char* text);
 
 #define UNION_VERTICAL_SPACING 4
 #define UNION_GUTTER_WIDTH 30
@@ -57,3 +58,4 @@ extern void copyText(char* text);
 #define UNKNOWN_CONSTRUCT_TEXT "???"
 
 GLOBAL mu_Context* ctx;
+GLOBAL NoUnionEx* lastFocusedEx;

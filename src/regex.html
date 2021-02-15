@@ -3,18 +3,99 @@
 
 <head>
 	<meta charset="UTF-8">
-	<title>Regexer</title>
+	<title>Regular Express</title>
+
+	<link rel="stylesheet" href="normalize.css">
 
 	<style>
+		* {
+			box-sizing: border-box;
+		}
+
 		body {
-			padding: 0;
+			font-family: -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol;
+		}
+
+		.ui-container {
+			height: 100vh;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.below-the-fold {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			padding-top: 2rem;
+			padding-bottom: 4rem;
+		}
+
+		header {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 3rem;
+			border-bottom: 1px solid #ccc;
+			margin-bottom: 0.6rem;
+		}
+
+		header h1 {
+			display: inline-block;
 			margin: 0;
+			font-weight: 600;
+		}
+
+		.tagline-container {
+			display: inline-flex;
+			align-items: center;
+			width: 0;
+			height: 3rem;
+			position: relative;
+		}
+
+		.tagline {
+			position: absolute;
+			right: 1rem;
+			white-space: nowrap;
+		}
+
+		.canvas-container {
+			flex-grow: 1;
+			width: 100%;
+			position: relative;
 		}
 
 		canvas {
 			position: absolute;
-			width: 100%;
-			height: 100%;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+		}
+
+		.site-width {
+			width: calc(100% - 1.2rem);
+			max-width: 64rem;
+		}
+
+		.regex-preview {
+			display: flex;
+			height: 4rem;
+			padding: 0.6rem 0;
+		}
+
+		#output {
+			flex-grow: 1;
+			border: 1px solid #ccc;
+			padding: 0 0.6rem;
+		}
+
+		#copy {
+			width: 10rem;
+			border: 1px solid #ccc;
+			margin-left: 0.6rem;
 		}
 
 		#invisible {
@@ -26,11 +107,46 @@
 </head>
 
 <body>
-	<canvas></canvas>
+	<div class="ui-container">
+		<header class="site-width">
+			<span class="tagline-container">
+				<span class="tagline">all aboard the</span>
+			</span>
+			<h1>Regular Express</h1>
+		</header>
+		<div class="canvas-container">
+			<canvas></canvas>
+		</div>
+		<div class="regex-preview site-width">
+			<input id="output">
+			<button id="copy">Copy</button>
+		</div>
+	</div>
+
+	<div class="below-the-fold">
+		<div class="site-width">
+			Regular Express lets you build regular expressions without ever touching the syntax.
+		</div>
+	</div>
 
 	<div id="invisible">
 		<div id="copytext"></div>
 	</div>
+
+	<script type="text/javascript">
+		const output = document.querySelector('#output');
+		const copyButton = document.querySelector('#copy');
+
+		output.addEventListener('change', e => {
+			e.preventDefault();
+		});
+		copyButton.addEventListener('click', () => {
+			navigator.clipboard.writeText(output.value)
+				.then(() => {
+					console.log("successfully copied");
+				});
+		});
+	</script>
 
 	<script type="text/javascript">
 		function dumpMem8(mem) {
@@ -42,6 +158,8 @@
 		}
 	</script>
 	<script type="module">
+		const header = document.querySelector('header');
+		const canvasContainer = document.querySelector('.canvas-container');
 		const canvas = document.querySelector('canvas');
 		const ctx = canvas.getContext('2d');
 
@@ -205,12 +323,11 @@
 							return metrics.width / dpr;
 						},
 
-						copyText: strPtr => {
-							const copytext = document.querySelector('#copytext');
-							copytext.innerText = getString(strPtr);
-							window.getSelection().selectAllChildren(copytext);
-							document.execCommand('copy');
-						}
+						setOutput: strPtr => {
+							const text = getString(strPtr);
+							output.value = text;
+							// console.log(text);
+						},
 					},
 				}
 			);
@@ -229,15 +346,18 @@
 			}
 
 			window.addEventListener('mousemove', e => {
-				test.exports.mouseMove(e.clientX, e.clientY);
+				const containerRect = canvasContainer.getBoundingClientRect();
+				test.exports.mouseMove(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();
 			});
 			window.addEventListener('mousedown', e => {
-				test.exports.mouseDown(e.clientX, e.clientY);
+				const containerRect = canvasContainer.getBoundingClientRect();
+				test.exports.mouseDown(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();
 			});
 			window.addEventListener('mouseup', e => {
-				test.exports.mouseUp(e.clientX, e.clientY);
+				const containerRect = canvasContainer.getBoundingClientRect();
+				test.exports.mouseUp(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();
 			});
 
@@ -339,8 +459,8 @@
 
 			function updateCanvasSize() {
 				dpr = window.devicePixelRatio;
-				canvas.width = window.innerWidth * dpr;
-				canvas.height = window.innerHeight * dpr;
+				canvas.width = canvasContainer.getBoundingClientRect().width * dpr;
+				canvas.height = canvasContainer.getBoundingClientRect().height * dpr;
 
 				ctx.textBaseline = 'top';
 				ctx.font = `${14 * dpr}px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol`;
@@ -368,7 +488,12 @@
 				}
 
 				const currentTime = new Date().getTime() / 1000;
-				const animating = test.exports.frame(canvas.width / dpr, canvas.height / dpr, currentTime - lastTime);
+				const animating = test.exports.frame(
+					canvas.width / dpr,
+					canvas.height / dpr,
+					header.getBoundingClientRect().width,
+					currentTime - lastTime
+				);
 
 				lastTime = currentTime;
 

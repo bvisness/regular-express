@@ -126,6 +126,19 @@ void NoUnionEx_RemoveUnits(NoUnionEx* ex, int minIndex, int maxIndex) {
     }
 }
 
+void NoUnionEx_RemoveSelection(NoUnionEx* ex) {
+    if (TextState_IsSelecting(ex->TextState)) {
+        int start = TextState_SelectionStart(ex->TextState);
+        int end = TextState_SelectionEnd(ex->TextState);
+        NoUnionEx_RemoveUnits(
+            ex,
+            start,
+            end + 1
+        );
+        ex->TextState = TextState_SetInsertIndex(ex->TextState, start, 0);
+    }
+}
+
 void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit) {
     // TODO: This could someday be more efficient by doing one big shift.
     for (int i = 0; i < End - Start + 1; i++) {
@@ -325,6 +338,12 @@ void Set_PushUndo(Set* set) {
     }
 }
 
+void SetItem_MakeRange(SetItem* item, char start, char end) {
+    item->Type = RE_SETITEM_RANGE;
+    item->Range.Min.C = start;
+    item->Range.Max.C = end;
+}
+
 void SetItem_PushUndo(SetItem* item) {
     if (!item) return;
 
@@ -355,7 +374,7 @@ char* MetaChar_GetHumanString(MetaChar* m) {
     case 's': return "whitespace";
     case 'S': return "non-whitespace";
     case 'b': return "word boundary";
-    case 'B': return "non word boundary";
+    case 'B': return "non-word-boundary";
     case 'f': return "formfeed page break";
     case 'n': return "newline";
     case 'r': return "carriage return";

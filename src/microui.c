@@ -1225,7 +1225,7 @@ int mu_begin_window_ex(mu_Context *ctx, const char *title, mu_Rect rect, int opt
   if (!cnt || !cnt->open) { return 0; }
   push(ctx->id_stack, id);
 
-  if (cnt->rect.w == 0) { cnt->rect = rect; }
+  if (cnt->rect.x == 0 && cnt->rect.y == 0 && cnt->rect.w == 0 && cnt->rect.h == 0) { cnt->rect = rect; }
   begin_root_container(ctx, cnt);
 
   /* process dragging early */

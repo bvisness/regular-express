@@ -76,6 +76,7 @@ mu_Id NoUnionEx_GetID(NoUnionEx* ex);
 void NoUnionEx_AddUnit(NoUnionEx* ex, struct Unit* unit, int index);
 struct Unit* NoUnionEx_RemoveUnit(NoUnionEx* ex, int index);
 void NoUnionEx_RemoveUnits(NoUnionEx* ex, int minIndex, int maxIndex);
+void NoUnionEx_RemoveSelection(NoUnionEx* ex);
 void NoUnionEx_ReplaceUnits(NoUnionEx* ex, int Start, int End, struct Unit* unit);
 void NoUnionEx_PushUndo(NoUnionEx* ex);
 
@@ -208,6 +209,7 @@ typedef struct SetItem {
     mu_Rect LastRect;
 } SetItem;
 
+void SetItem_MakeRange(SetItem* item, char start, char end);
 void SetItem_PushUndo(SetItem* item);
 
 char* ToString(Regex* regex);

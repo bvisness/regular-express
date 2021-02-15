@@ -297,6 +297,8 @@ void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth) {
     }
 
     if (ctx->focus == muid) {
+        lastFocusedEx = ex;
+
         // draw cursor
         Unit* cursorUnit = ex->Units[ex->TextState.CursorIndex];
         mu_Rect contentsRect = cursorUnit->Contents.LastRect;
