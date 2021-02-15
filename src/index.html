@@ -275,8 +275,8 @@
 				buf[ptr + i] = 0;
 			}
 
-			const sysFetch = fetch("/build/sys.wasm");
-			const mainFetch = fetch("/build/regex.wasm");
+			const sysFetch = fetch("sys.wasm");
+			const mainFetch = fetch("regex.wasm");
 
 			const { instance: sys } = await WebAssembly.instantiateStreaming(
 				sysFetch,

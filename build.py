@@ -4,6 +4,9 @@ import glob
 import os
 import re
 import subprocess
+import random
+import shutil
+import string
 
 clang = 'clang'
 wasmld = 'wasm-ld'
@@ -20,11 +23,9 @@ try:
 except FileNotFoundError:
     pass
 
+shutil.rmtree('build')
 os.makedirs('build', exist_ok=True)
 os.chdir('build')
-
-for f in glob.glob('*'):
-    os.remove(f)
 
 flags = [
     '--target=wasm32',
@@ -59,3 +60,34 @@ subprocess.run([
 ] + ofiles)
 
 # subprocess.run(['wasm2wat', 'regex.wasm'], stdout=open('regex.wat', 'w'))
+
+# Output the dist folder for upload
+
+os.chdir('..')
+os.makedirs('build/dist', exist_ok=True)
+
+buildId = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8)) # so beautiful. so pythonic.
+
+root = 'src/index.html';
+assets = [
+    'src/normalize.css',
+    'build/regex.wasm',
+    'build/sys.wasm',
+];
+
+rootContents = open(root).read();
+
+def addId(filename, id):
+    parts = filename.split('.')
+    parts.insert(-1, buildId)
+    return '.'.join(parts)
+
+for asset in assets:
+    basename = os.path.basename(asset)
+    newFilename = addId(basename, buildId)
+    shutil.copy(asset, 'build/dist/{}'.format(newFilename))
+
+    rootContents = rootContents.replace(basename, newFilename)
+
+with open('build/dist/index.html', 'w') as f:
+    f.write(rootContents)
