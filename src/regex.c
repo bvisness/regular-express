@@ -68,6 +68,8 @@ void blur() {
 	mu_input_clear(ctx);
 }
 
+char initialRegexBuf[2048];
+
 Regex* regex;
 
 int mu_auto_width_button(mu_Context* ctx, const char* str, int padding) {
@@ -83,14 +85,8 @@ void insertNewUnit(NoUnionEx* ex, Unit* unit) {
 }
 
 void init() {
-	regex = Regex_init(RE_NEW(Regex));
+	regex = parse(initialRegexBuf);
 	NoUnionEx* ex = regex->UnionMembers[0];
-
-	const char* initialString = "Hello";
-	for (int i = 0; i < strlen(initialString); i++) {
-		Unit* unit = Unit_initWithLiteralChar(RE_NEW(Unit), *(initialString + i));
-		NoUnionEx_AddUnit(ex, unit, -1);
-	}
 
 	ctx = malloc(sizeof(mu_Context));
 	mu_init(ctx);

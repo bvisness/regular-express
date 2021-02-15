@@ -326,7 +326,7 @@
 						setOutput: strPtr => {
 							const text = getString(strPtr);
 							output.value = text;
-							// console.log(text);
+							window.localStorage.setItem('outputRegex', text);
 						},
 					},
 				}
@@ -472,6 +472,10 @@
 			updateCanvasSize();
 			window.addEventListener('resize', () => { updateCanvasSize(); });
 
+			putString(
+				test.exports.initialRegexBuf,
+				window.localStorage.getItem('outputRegex') || 'Hello'
+			);
 			test.exports.init();
 
 			// TODO: The timer should probably have a cap or otherwise
