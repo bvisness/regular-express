@@ -1,4 +1,4 @@
-# Regex Builder
+# Regular Express
 
 A tool that allows you to build regular expressions completely visually. Use the power of regular expressions without getting bogged down by the syntax!
 

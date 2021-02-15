@@ -28,7 +28,7 @@
 			flex-direction: column;
 			align-items: center;
 
-			padding-top: 2rem;
+			padding-top: 1rem;
 			padding-bottom: 4rem;
 		}
 
@@ -36,7 +36,7 @@
 			display: flex;
 			justify-content: center;
 			align-items: center;
-			height: 3rem;
+			height: 3.4rem;
 			border-bottom: 1px solid #ccc;
 			margin-bottom: 0.6rem;
 		}
@@ -59,6 +59,8 @@
 			position: absolute;
 			right: 1rem;
 			white-space: nowrap;
+			font-style: italic;
+			color: #999;
 		}
 
 		.canvas-container {
@@ -67,12 +69,25 @@
 			position: relative;
 		}
 
-		canvas {
+		canvas, .error-output {
 			position: absolute;
 			top: 0;
 			left: 0;
 			right: 0;
 			bottom: 0;
+		}
+
+		.error-output {
+			background-color: white;
+			text-align: center;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			padding: 2rem;
+		}
+
+		.error-output h2 {
+			color: red;
 		}
 
 		.site-width {
@@ -103,6 +118,18 @@
 			opacity: 0;
 			pointer-events: none;
 		}
+
+		.hide {
+			display: none;
+		}
+
+		p, ol, ul {
+			line-height: 1.5;
+		}
+
+		li {
+			margin-bottom: 0.2em;
+		}
 	</style>
 </head>
 
@@ -112,10 +139,14 @@
 			<span class="tagline-container">
 				<span class="tagline">all aboard the</span>
 			</span>
-			<h1>Regular Express</h1>
+			<h1>🚂 Regular Express 🚂</h1>
 		</header>
 		<div class="canvas-container">
 			<canvas></canvas>
+			<div class="error-output hide">
+				<h2>Sorry, the train has jumped the tracks.</h2>
+				<p>The program has crashed. If you have time, please <a href="https://github.com/bvisness/regular-express/issues" target="_blank">create a GitHub issue</a> describing what you were doing when it crashed.</p>
+			</div>
 		</div>
 		<div class="regex-preview site-width">
 			<input id="output">
@@ -125,7 +156,25 @@
 
 	<div class="below-the-fold">
 		<div class="site-width">
-			Regular Express lets you build regular expressions without ever touching the syntax.
+			<h2>What is this?</h2>
+
+			<p>Regular Express lets you build regular expressions without ever touching the syntax. It supports the features and syntax of JavaScript regular expressions.</p>
+
+			<p>Things you can do:</p>
+			<ul>
+				<li>Type any text to have it recognized (it will automatically be escaped if necessary).</li>
+				<li>Hover over the text to expose wire handles. Drag from handle to handle to skip parts of the text or make it repeat.</li>
+				<li>Turn your selection into a group by clicking Make Group.</li>
+				<li>Click the + button to add an alternate pattern to match.</li>
+				<li>Add a character set by clicking the Character Set button. (This will recognize a single character matching the ones you provide.)</li>
+				<li>Type a dash in a character set to recognize a range of characters (e.g. <code>a-z</code> to recognize lowercase letters.)</li>
+				<li>Recognize common groups of characters like digits and whitespace by using the "Special Character" and "Common Sets" tools.</li>
+				<li>If you already know regex syntax, quickly input special regex characters, group, sets, etc. by holding the Alt key. For example, pressing Alt-? will make the item before the cursor optional, and pressing Alt-[ will create a character set.</li>
+			</ul>
+
+			<p>It is currently in an alpha state, so expect bugs! There are also some features not yet supported - you can see the project roadmap <a href="https://www.notion.so/bvisness/3708fea1fb9d43f1b51b7512d685f963?v=c0b80b9cebc843f5b95dac1370bfa76b" target="_blank">here</a>.</p>
+
+			<p>Please let me know <a href="https://github.com/bvisness/regular-express/issues" target="_blank">in a GitHub issue</a> if you run into issues, find things confusing, or have any other feedback.</p>
 		</div>
 	</div>
 
@@ -494,27 +543,32 @@
 			// by a lot.
 			let lastTime = new Date().getTime() / 1000;
 			function doFrame() {
-				const memBuf = new Uint8Array(mem.buffer);
-				for (let i = 0; i < 1024; i++) {
-					if (memBuf[i] != 0b10101010) {
-						console.error("WRITE TO PROTECTED MEMORY!", { index: i });
+				try {
+					const memBuf = new Uint8Array(mem.buffer);
+					for (let i = 0; i < 1024; i++) {
+						if (memBuf[i] != 0b10101010) {
+							console.error("WRITE TO PROTECTED MEMORY!", { index: i });
+						}
 					}
-				}
 
-				const currentTime = new Date().getTime() / 1000;
-				const animating = test.exports.frame(
-					canvas.width / dpr,
-					canvas.height / dpr,
-					header.getBoundingClientRect().width,
-					currentTime - lastTime
-				);
+					const currentTime = new Date().getTime() / 1000;
+					const animating = test.exports.frame(
+						canvas.width / dpr,
+						canvas.height / dpr,
+						header.getBoundingClientRect().width,
+						currentTime - lastTime
+					);
 
-				lastTime = currentTime;
+					lastTime = currentTime;
 
-				if (animating) {
-					window.requestAnimationFrame(doFrame);
-				} else {
-					awake = false;
+					if (animating) {
+						window.requestAnimationFrame(doFrame);
+					} else {
+						awake = false;
+					}
+				} catch (error) {
+					console.error(error);
+					document.querySelector('.error-output').classList.toggle('hide', false);
 				}
 			}
 			wakeUp();
