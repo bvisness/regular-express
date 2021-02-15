@@ -23,7 +23,10 @@ try:
 except FileNotFoundError:
     pass
 
-shutil.rmtree('build')
+try:
+    shutil.rmtree('build')
+except:
+    pass
 os.makedirs('build', exist_ok=True)
 os.chdir('build')
 
