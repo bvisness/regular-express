@@ -36,7 +36,7 @@ flags = [
     '-nostdlib',
     '-I', '../src/fakestdlib',
     '-Wall', '-Wno-builtin-requires-header',
-];
+]
 
 for watfile in glob.glob('../src/**/*.wat', recursive=True):
     subprocess.run(['wat2wasm', watfile])
@@ -48,37 +48,43 @@ for cfile in glob.glob('../src/**/*.c', recursive=True):
     subprocess.run([clang] + flags + ['-o', ofile, cfile])
     ofiles.append(ofile)
 
-page_bytes = 65536
-num_pages = 256
-
 subprocess.run([
     wasmld,
     '--no-entry',
     '--export-all', '--no-gc-sections',
     '--allow-undefined',
     '--import-memory',
-    '--initial-memory={}'.format(page_bytes * num_pages),
     '--lto-O2',
     '-o', 'regex.wasm',
 ] + ofiles)
 
-# subprocess.run(['wasm2wat', 'regex.wasm'], stdout=open('regex.wat', 'w'))
+# Optimize output WASM file
+subprocess.run([
+    'wasm-opt', 'regex.wasm',
+    '-o', 'regex.wasm',
+    '--memory-packing', # remove unnecessary and extremely large .bss segment
+])
 
+# Uncomment to produce a WAT version of the code for inspection. Rather slow.
+subprocess.run(['wasm2wat', 'regex.wasm', '-o', 'regex.wat'])
+
+#
 # Output the dist folder for upload
+#
 
 os.chdir('..')
 os.makedirs('build/dist', exist_ok=True)
 
 buildId = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8)) # so beautiful. so pythonic.
 
-root = 'src/index.html';
+root = 'src/index.html'
 assets = [
     'src/normalize.css',
     'build/regex.wasm',
     'build/sys.wasm',
-];
+]
 
-rootContents = open(root).read();
+rootContents = open(root).read()
 
 def addId(filename, id):
     parts = filename.split('.')
