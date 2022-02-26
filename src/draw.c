@@ -837,13 +837,16 @@ void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin) {
     // Draw "one of"
     {
         const char* oneofStr = set->IsNegative ? SET_ONEOF_TEXT_NEG : SET_ONEOF_TEXT;
-        mu_Vec2 pos = mu_position_text(ctx,
-            oneofStr,
-            mu_rect(origin.x, origin.y + SET_PADDING, parent->Size.x, SET_ONEOF_HEIGHT),
-            NULL,
-            MU_OPT_ALIGNCENTER
+        mu_Rect rect = mu_rect(
+            origin.x + SET_PADDING + 1,
+            origin.y + SET_PADDING + 1,
+            parent->Size.x - 2*SET_PADDING - 2,
+            SET_ONEOF_HEIGHT - 2
         );
-        draw_arbitrary_text(ctx, oneofStr, pos, COLOR_RE_TEXT_DIM);
+        mu_layout_set_next(ctx, rect, 0);
+        if (mu_button(ctx, oneofStr)) {
+            set->IsNegative = !set->IsNegative;
+        }
     }
 
     int itemX = origin.x + SET_PADDING;

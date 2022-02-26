@@ -42,7 +42,7 @@ extern void setOutput(char* text);
 #define SET_DASH_WIDTH 10
 #define SET_ONEOF_TEXT "one of"
 #define SET_ONEOF_TEXT_NEG "anything but"
-#define SET_ONEOF_HEIGHT 16
+#define SET_ONEOF_HEIGHT 22
 #define GROUP_VERTICAL_PADDING 4
 #define CURSOR_THICKNESS 2
 #define CURSOR_VERTICAL_PADDING 2
