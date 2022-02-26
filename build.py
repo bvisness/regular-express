@@ -62,6 +62,7 @@ subprocess.run([
 subprocess.run([
     'wasm-opt', 'regex.wasm',
     '-o', 'regex.wasm',
+    '-O2', # general perf optimizations
     '--memory-packing', # remove unnecessary and extremely large .bss segment
 ])
 
