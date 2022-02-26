@@ -66,7 +66,7 @@ subprocess.run([
     '--memory-packing', # remove unnecessary and extremely large .bss segment
 ])
 
-# Uncomment to produce a WAT version of the code for inspection. Rather slow.
+# Produce a WAT version of the code for inspection.
 subprocess.run(['wasm2wat', 'regex.wasm', '-o', 'regex.wat'])
 
 #
