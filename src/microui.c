@@ -190,6 +190,7 @@ void mu_end(mu_Context *ctx) {
   ctx->mouse_started_drag = 0;
   ctx->scroll_delta = mu_vec2(0, 0);
   ctx->last_mouse_pos = ctx->mouse_pos;
+  ctx->input_keycode[0] = '\0';
 
   /* sort root containers by zindex */
   n = ctx->root_list.idx;
