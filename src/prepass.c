@@ -56,7 +56,11 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
 
         int inputTextLength = strlen(ctx->input_text);
 
+        Unit* nextUnit = NULL;
         Unit* previousUnit = NULL;
+        if (ex->TextState.InsertIndex < ex->NumUnits) {
+            nextUnit = ex->Units[ex->TextState.InsertIndex];
+        }
         if (ex->TextState.InsertIndex > 0) {
             previousUnit = ex->Units[ex->TextState.InsertIndex - 1];
         }
@@ -132,24 +136,44 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 ex,
                 ex->NumUnits
             );
+        } else if (ctx->key_pressed & MU_KEY_ARROWLEFT
+                && !TextState_IsSelecting(ex->TextState)
+                && previousUnit && previousUnit->Contents.Type == RE_CONTENTS_SET
+        ) {
+            // Left arrow after set, not selecting - move into set
+            ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+            Set* set = previousUnit->Contents.Set;
+            mu_set_focus(ctx, Set_GetID(set));
+            set->TextState = TextState_SetCursorIndex(set->NumItems, 1);
         } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT
                 && !TextState_IsSelecting(ex->TextState)
-                && ex->Index < (regex->NumUnionMembers - 1)
-                && ex->TextState.InsertIndex == ex->NumUnits
+                && nextUnit && nextUnit->Contents.Type == RE_CONTENTS_SET
         ) {
+            // Right arrow before set, not selecting - move into set
             ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
-            NoUnionEx* nextEx = regex->UnionMembers[ex->Index + 1];
-            mu_set_focus(ctx, NoUnionEx_GetID(nextEx));
-            nextEx->TextState = TextState_SetCursorIndex(0, 0);
+            Set* set = nextUnit->Contents.Set;
+            mu_set_focus(ctx, Set_GetID(set));
+            set->TextState = TextState_SetCursorIndex(0, 0);
         } else if (ctx->key_pressed & MU_KEY_ARROWLEFT
                 && !TextState_IsSelecting(ex->TextState)
                 && ex->Index > 0
                 && ex->TextState.InsertIndex == 0
         ) {
+            // Left arrow at beginning of expression, not selecting - move to previous union member if any
             ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
             NoUnionEx* previousEx = regex->UnionMembers[ex->Index - 1];
             mu_set_focus(ctx, NoUnionEx_GetID(previousEx));
             previousEx->TextState = TextState_SetCursorIndex(previousEx->NumUnits - 1, 1);
+        } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT
+                && !TextState_IsSelecting(ex->TextState)
+                && ex->Index < (regex->NumUnionMembers - 1)
+                && ex->TextState.InsertIndex == ex->NumUnits
+        ) {
+            // Right arrow at end of expression, not selecting - move to next union member if any
+            ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+            NoUnionEx* nextEx = regex->UnionMembers[ex->Index + 1];
+            mu_set_focus(ctx, NoUnionEx_GetID(nextEx));
+            nextEx->TextState = TextState_SetCursorIndex(0, 0);
         } else if (ctx->key_down & MU_KEY_SHIFT && ctx->key_pressed & MU_KEY_TAB) {
             // shift-tab
             ctx->key_pressed &= ~MU_KEY_TAB;
@@ -640,22 +664,36 @@ void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
             mu_set_focus(ctx, NoUnionEx_GetID(ex));
             int doCursorRight = set->TextState.CursorIndex > (set->NumItems / 2);
             ex->TextState = TextState_SetCursorIndex(unit->Index, doCursorRight);
-        } else if (
-            ctx->key_down & MU_KEY_ALT
-            && (
-                (ctx->input_text[0] && ctx->input_text[0] == ']')
-                || strcmp(ctx->input_keycode, "BracketRight") == 0
-            )
+        } else if (ctx->key_pressed & MU_KEY_ARROWLEFT
+                && set->TextState.InsertIndex == 0
+                && !TextState_IsSelecting(set->TextState)
+        ) {
+            // Left arrow at start of set, not selecting - move out and left
+            ctx->key_pressed &= ~MU_KEY_ARROWLEFT;
+            mu_set_focus(ctx, NoUnionEx_GetID(ex));
+            ex->TextState = TextState_SetCursorIndex(unit->Index, 0);
+        } else if (ctx->key_pressed & MU_KEY_ARROWRIGHT
+                && set->TextState.InsertIndex == set->NumItems
+                && !TextState_IsSelecting(set->TextState)
+        ) {
+            // Right arrow at end of set, not selecting - move out and right
+            ctx->key_pressed &= ~MU_KEY_ARROWRIGHT;
+            mu_set_focus(ctx, NoUnionEx_GetID(ex));
+            ex->TextState = TextState_SetCursorIndex(unit->Index, 1);
+        } else if (ctx->key_down & MU_KEY_ALT
+                && (
+                    (ctx->input_text[0] && ctx->input_text[0] == ']')
+                    || strcmp(ctx->input_keycode, "BracketRight") == 0
+                )
         ) {
             // Shortcut to exit the set
             mu_set_focus(ctx, NoUnionEx_GetID(ex));
             ex->TextState = TextState_SetCursorIndex(unit->Index, 1);
-        } else if (
-            ctx->key_down & MU_KEY_ALT
-            && (
-                (ctx->input_text[0] && ctx->input_text[0] == '^')
-                || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit6") == 0)
-            )
+        } else if (ctx->key_down & MU_KEY_ALT
+                && (
+                    (ctx->input_text[0] && ctx->input_text[0] == '^')
+                    || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit6") == 0)
+                )
         ) {
             // Shortcut to toggle negated-ness
             set->IsNegative = !set->IsNegative;
