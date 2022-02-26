@@ -539,7 +539,10 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
             prepass_Set(set, ex, unit);
 
             // calculate sizes
-            Vec2i contentsSize = {0};
+            Vec2i contentsSize = {
+                .w = 0,
+                .h = UNIT_CONTENTS_MIN_HEIGHT,
+            };
 
             for (int i = 0; i < set->NumItems; i++) {
                 SetItem* item = set->Items[i];
@@ -559,11 +562,14 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
                 contentsSize.h = imax(contentsSize.h, item->Size.h);
             }
 
+            const char* oneofStr = set->IsNegative ? SET_ONEOF_TEXT_NEG : SET_ONEOF_TEXT;
+            int oneofWidth = SET_PADDING*2 + measureText(oneofStr, strlen(oneofStr)) + SET_PADDING*2;
+
             contents->Size = (Vec2i) {
-                .w = SET_PADDING + contentsSize.w + SET_PADDING,
-                .h = SET_PADDING + contentsSize.h + SET_PADDING,
+                .w = SET_PADDING + imax(contentsSize.w, oneofWidth) + SET_PADDING,
+                .h = SET_PADDING + SET_ONEOF_HEIGHT + SET_PADDING + contentsSize.h + SET_PADDING,
             };
-            contents->WireHeight = UNIT_CONTENTS_MIN_HEIGHT/2;
+            contents->WireHeight = SET_PADDING + SET_ONEOF_HEIGHT + SET_PADDING + contentsSize.h/2;
         } break;
         case RE_CONTENTS_GROUP: {
             Group* group = contents->Group;
@@ -634,6 +640,25 @@ void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
             mu_set_focus(ctx, NoUnionEx_GetID(ex));
             int doCursorRight = set->TextState.CursorIndex > (set->NumItems / 2);
             ex->TextState = TextState_SetCursorIndex(unit->Index, doCursorRight);
+        } else if (
+            ctx->key_down & MU_KEY_ALT
+            && (
+                (ctx->input_text[0] && ctx->input_text[0] == ']')
+                || strcmp(ctx->input_keycode, "BracketRight") == 0
+            )
+        ) {
+            // Shortcut to exit the set
+            mu_set_focus(ctx, NoUnionEx_GetID(ex));
+            ex->TextState = TextState_SetCursorIndex(unit->Index, 1);
+        } else if (
+            ctx->key_down & MU_KEY_ALT
+            && (
+                (ctx->input_text[0] && ctx->input_text[0] == '^')
+                || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit6") == 0)
+            )
+        ) {
+            // Shortcut to toggle negated-ness
+            set->IsNegative = !set->IsNegative;
         } else {
             result = StandardTextInput(ctx, set->TextState, set->NumItems);
             set->TextState = result.ResultState;
@@ -652,12 +677,6 @@ void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
             for (int i = 0; i < inputTextLength; i++) {
                 do {
                     if (inputTextLength == 1) {
-                        if (ctx->key_down & MU_KEY_ALT && ctx->input_text[i] == ']') {
-                            mu_set_focus(ctx, NoUnionEx_GetID(ex));
-                            ex->TextState = TextState_SetCursorIndex(unit->Index, 1);
-                            break;
-                        }
-
                         if (
                             ctx->input_text[i] == '-'
                             && itemBeforeCursor

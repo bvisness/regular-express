@@ -818,7 +818,7 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
         } break;
         case RE_CONTENTS_SET: {
             mu_draw_rect(ctx, r, backgroundColor);
-            drawRailroad_Set(contents->Set, origin);
+            drawRailroad_Set(contents->Set, contents, origin);
         } break;
         case RE_CONTENTS_GROUP: {
             drawRailroad_Group(contents->Group, origin, unitDepth, selected);
@@ -831,13 +831,23 @@ void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDep
     }
 }
 
-void drawRailroad_Set(Set* set, Vec2i origin) {
+void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin) {
     mu_Id muid = mu_get_id_noidstack(ctx, &set, sizeof(Set*));
 
-    // TODO: Selections
+    // Draw "one of"
+    {
+        const char* oneofStr = set->IsNegative ? SET_ONEOF_TEXT_NEG : SET_ONEOF_TEXT;
+        mu_Vec2 pos = mu_position_text(ctx,
+            oneofStr,
+            mu_rect(origin.x, origin.y + SET_PADDING, parent->Size.x, SET_ONEOF_HEIGHT),
+            NULL,
+            MU_OPT_ALIGNCENTER
+        );
+        draw_arbitrary_text(ctx, oneofStr, pos, COLOR_RE_TEXT_DIM);
+    }
 
     int itemX = origin.x + SET_PADDING;
-    int itemY = origin.y + SET_PADDING;
+    int itemY = origin.y + SET_PADDING + SET_ONEOF_HEIGHT + SET_PADDING;
 
     const char* dashStr = "-";
 
@@ -891,40 +901,51 @@ void drawRailroad_Set(Set* set, Vec2i origin) {
         if (ctx->mouse_released & MU_MOUSE_LEFT && mu_mouse_over(ctx, itemRect)) {
             ctx->mouse_released &= ~MU_MOUSE_LEFT;
             mu_set_focus(ctx, muid);
-            set->TextState = TextState_SetInsertIndex(set->TextState, i, 0); // TODO: Selection
-            // TODO: right cursor?
+            set->TextState = TextState_SetInsertIndex(set->TextState, i, 0);
         }
     }
 
     if (ctx->focus == muid) {
         ctx->updated_focus = 1;
 
-        // Draw cursor according to what we have _now_
-        SetItem* cursorItem = set->Items[set->TextState.CursorIndex];
-        mu_Rect itemRect = cursorItem->LastRect;
-
-        if (set->TextState.CursorRight) {
+        if (set->NumItems == 0) {
             mu_draw_rect(
                 ctx,
                 mu_rect(
-                    itemRect.x + itemRect.w - CURSOR_THICKNESS,
-                    itemRect.y + CURSOR_VERTICAL_PADDING,
+                    origin.x + SET_PADDING,
+                    itemY,
                     CURSOR_THICKNESS,
-                    itemRect.h - CURSOR_VERTICAL_PADDING*2
+                    UNIT_CONTENTS_MIN_HEIGHT
                 ),
                 COLOR_CURSOR
             );
         } else {
-            mu_draw_rect(
-                ctx,
-                mu_rect(
-                    itemRect.x,
-                    itemRect.y + CURSOR_VERTICAL_PADDING,
-                    CURSOR_THICKNESS,
-                    itemRect.h - CURSOR_VERTICAL_PADDING*2
-                ),
-                COLOR_CURSOR
-            );
+            SetItem* cursorItem = set->Items[set->TextState.CursorIndex];
+            mu_Rect itemRect = cursorItem->LastRect;
+
+            if (set->TextState.CursorRight) {
+                mu_draw_rect(
+                    ctx,
+                    mu_rect(
+                        itemRect.x + itemRect.w - CURSOR_THICKNESS,
+                        itemRect.y + CURSOR_VERTICAL_PADDING,
+                        CURSOR_THICKNESS,
+                        itemRect.h - CURSOR_VERTICAL_PADDING*2
+                    ),
+                    COLOR_CURSOR
+                );
+            } else {
+                mu_draw_rect(
+                    ctx,
+                    mu_rect(
+                        itemRect.x,
+                        itemRect.y + CURSOR_VERTICAL_PADDING,
+                        CURSOR_THICKNESS,
+                        itemRect.h - CURSOR_VERTICAL_PADDING*2
+                    ),
+                    COLOR_CURSOR
+                );
+            }
         }
     }
 }

@@ -221,6 +221,11 @@ Unit* parseSet(char* regexStr, int* i, int len) {
 
     Set* set = setUnit->Contents.Set;
 
+    if (regexStr[*i] == '^') {
+        set->IsNegative = 1;
+        (*i)++;
+    }
+
     while (1) {
         char c = regexStr[*i];
 

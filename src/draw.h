@@ -13,7 +13,7 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth);
 void drawRailroad_NoUnionEx(NoUnionEx* ex, Vec2i origin, int unitDepth);
 void drawRailroad_Unit(Unit* unit, NoUnionEx* parent, Vec2i origin, int depth, UnitRange* selection);
 void drawRailroad_UnitContents(UnitContents* contents, Vec2i origin, int unitDepth, int selected);
-void drawRailroad_Set(Set* set, Vec2i origin);
+void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin);
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected);
 
 void draw_arbitrary_text(mu_Context* ctx, const char* str, mu_Vec2 pos, mu_Color color);

@@ -37,9 +37,12 @@ extern void setOutput(char* text);
 #define UNIT_CONTENTS_MIN_HEIGHT 20
 #define UNIT_CONTENTS_LITCHAR_WIDTH 15
 #define WIRE_THICKNESS 2
-#define SET_PADDING 2
+#define SET_PADDING 4
 #define SET_HORIZONTAL_SPACING 2
 #define SET_DASH_WIDTH 10
+#define SET_ONEOF_TEXT "one of"
+#define SET_ONEOF_TEXT_NEG "anything but"
+#define SET_ONEOF_HEIGHT 16
 #define GROUP_VERTICAL_PADDING 4
 #define CURSOR_THICKNESS 2
 #define CURSOR_VERTICAL_PADDING 2
