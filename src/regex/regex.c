@@ -605,6 +605,13 @@ char* toString_SetItemRange(char* base, SetItemRange* range) {
         return base;
     }
 
+    if (!range->Max.C) {
+        // Null character on the end...common during input
+        base = toString_LitChar(base, &range->Min);
+        base = writeString(base, "\\-"); // escape hyphen to be safe
+        return base;
+    }
+
     base = toString_LitChar(base, &range->Min);
     base = writeString(base, "-");
     base = toString_LitChar(base, &range->Max);
