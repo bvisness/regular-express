@@ -5,80 +5,23 @@
 		(param $ptr i32) (param $value i32) (param $num i32)
 		(result i32)
 
-		(local $currentPtr i32)
-		get_local $ptr
-		set_local $currentPtr
+		local.get $ptr
+		local.get $value
+		local.get $num
+		memory.fill
 
-		loop
-			;; store value
-			get_local $currentPtr
-			get_local $value
-			i32.store8
-
-			;; increment currentPtr
-			get_local $currentPtr
-			i32.const 1
-			i32.add
-			set_local $currentPtr
-
-			;; decrement num
-			get_local $num
-			i32.const 1
-			i32.sub
-			tee_local $num
-
-			br_if 0
-		end
-
-		get_local $ptr
+		local.get $ptr
 	)
 	(func (export "memcpy")
 		(param $dst i32) (param $src i32) (param $count i32)
 		(result i32)
 
-		(local $currentSrc i32)
-		(local $currentDst i32)
+		local.get $dst
+		local.get $src
+		local.get $count
+		memory.copy
 
-		get_local $src
-		set_local $currentSrc
-		get_local $dst
-		set_local $currentDst
-
-		;; bail early if zero
-		block
-			get_local $count
-			br_if 0
-			get_local $dst
-			return
-		end
-
-		loop
-			;; copy value
-			get_local $currentDst
-			get_local $currentSrc
-			i32.load8_u
-			i32.store8
-
-			;; increment ptrs
-			get_local $currentSrc
-			i32.const 1
-			i32.add
-			set_local $currentSrc
-			get_local $currentDst
-			i32.const 1
-			i32.add
-			set_local $currentDst
-
-			;; decrement count
-			get_local $count
-			i32.const 1
-			i32.sub
-			tee_local $count
-
-			br_if 0
-		end
-
-		get_local $dst
+		local.get $dst
 	)
 	(func (export "memchr")
 		(param $ptr i32) (param $value i32) (param $num i32)
@@ -86,31 +29,31 @@
 
 		(local $currentPtr i32)
 
-		get_local $ptr
-		set_local $currentPtr
+		local.get $ptr
+		local.set $currentPtr
 
 		loop
 			;; check if pointing at occurrence of value
-			get_local $currentPtr
+			local.get $currentPtr
 			i32.load8_u
-			get_local $value
+			local.get $value
 			i32.eq
 			if
-				get_local $currentPtr
+				local.get $currentPtr
 				return
 			end
 
 			;; increment currentPtr
-			get_local $currentPtr
+			local.get $currentPtr
 			i32.const 1
 			i32.add
-			set_local $currentPtr
+			local.set $currentPtr
 
 			;; decrement num
-			get_local $num
+			local.get $num
 			i32.const 1
 			i32.sub
-			tee_local $num
+			local.tee $num
 
 			br_if 0
 		end
