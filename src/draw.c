@@ -849,7 +849,7 @@ void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin) {
         }
     }
 
-    int itemX = origin.x + SET_PADDING;
+    int itemX = origin.x + parent->Size.w/2 - set->ItemsSize.w/2;
     int itemY = origin.y + SET_PADDING + SET_ONEOF_HEIGHT + SET_PADDING;
 
     const char* dashStr = "-";
@@ -915,7 +915,7 @@ void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin) {
             mu_draw_rect(
                 ctx,
                 mu_rect(
-                    origin.x + SET_PADDING,
+                    origin.x + parent->Size.w/2 - CURSOR_THICKNESS/2,
                     itemY,
                     CURSOR_THICKNESS,
                     UNIT_CONTENTS_MIN_HEIGHT

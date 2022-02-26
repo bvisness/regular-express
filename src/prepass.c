@@ -585,6 +585,7 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
                 contentsSize.w += (i > 0 ? SET_HORIZONTAL_SPACING : 0) + item->Size.w;
                 contentsSize.h = imax(contentsSize.h, item->Size.h);
             }
+            contents->Set->ItemsSize = contentsSize;
 
             const char* oneofStr = set->IsNegative ? SET_ONEOF_TEXT_NEG : SET_ONEOF_TEXT;
             int oneofWidth = SET_PADDING*2 + measureText(oneofStr, strlen(oneofStr)) + SET_PADDING*2;

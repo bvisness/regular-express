@@ -185,7 +185,7 @@ typedef struct Set {
     int IsNegative;
     TextInputState TextState;
 
-    Vec2i Size;
+    Vec2i ItemsSize;
 } Set;
 
 mu_Id Set_GetID(Set* set);
