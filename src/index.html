@@ -441,7 +441,7 @@
 
 				if (e.key === 'Shift') {
 					func(1 << 0);
-				} else if (e.key === 'Control') {
+				} else if (e.key === 'Control' || e.key === 'Meta') {
 					func(1 << 1);
 				} else if (e.key === 'Alt') {
 					func(1 << 2);
@@ -473,11 +473,12 @@
 				if (e.key.length > 1) {
 					specialKeyEvent('down', e);
 				} else if (
-					!e.ctrlKey
+					!(e.ctrlKey || e.metaKey)
 					|| e.code == 'KeyA'
 					|| e.code == 'KeyZ'
 				) {
 					putString(regex.exports.textInputBuf, e.key);
+					putString(regex.exports.keyCodeBuf, e.code);
 					regex.exports.textInput();
 					e.preventDefault();
 				}

@@ -456,11 +456,12 @@ void mu_input_keyup(mu_Context *ctx, int key) {
 }
 
 
-void mu_input_text(mu_Context *ctx, const char *text) {
+void mu_input_text(mu_Context *ctx, const char *text, const char *keyCode) {
   int len = strlen(ctx->input_text);
   int size = strlen(text) + 1;
   expect(len + size <= (int) sizeof(ctx->input_text));
   memcpy(ctx->input_text + len, text, size);
+  memcpy(ctx->input_keycode, keyCode, sizeof(ctx->input_keycode));
 }
 
 

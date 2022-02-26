@@ -244,6 +244,7 @@ struct mu_Context {
   // Ben's custom additions
   float dt;
   int animating;
+  char input_keycode[1024]; // Corresponds to KeyboardEvent.code: http://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code
 };
 
 
@@ -278,7 +279,7 @@ void mu_input_mouseup(mu_Context *ctx, int x, int y, int btn);
 void mu_input_scroll(mu_Context *ctx, int x, int y);
 void mu_input_keydown(mu_Context *ctx, int key);
 void mu_input_keyup(mu_Context *ctx, int key);
-void mu_input_text(mu_Context *ctx, const char *text);
+void mu_input_text(mu_Context *ctx, const char *text, const char *keyCode);
 void mu_input_clear(mu_Context *ctx);
 
 mu_Command* mu_push_command(mu_Context *ctx, int type, int size);

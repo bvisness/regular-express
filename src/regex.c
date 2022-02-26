@@ -56,8 +56,9 @@ void keyUp(int key) {
 }
 
 char textInputBuf[1024];
+char keyCodeBuf[128];
 void textInput() {
-	mu_input_text(ctx, textInputBuf);
+	mu_input_text(ctx, textInputBuf, keyCodeBuf);
 }
 
 void scroll(int x, int y) {

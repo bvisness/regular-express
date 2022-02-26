@@ -243,14 +243,20 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
         } else if (ctx->key_down & MU_KEY_ALT && inputTextLength == 1) {
             // Alt-Whatever shortcut
             Unit* newUnit = NULL;
-            if (ctx->input_text[0] == '[') {
+            if (
+                ctx->input_text[0] == '['
+                || strcmp(ctx->input_keycode, "BracketLeft") == 0
+            ) {
                 if (selectedUnits.Ex) {
                     DeleteRange(selectedUnits);
                 }
                 newUnit = Unit_init(RE_NEW(Unit));
                 UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SET);
                 mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Set, sizeof(Set*)));
-            } else if (ctx->input_text[0] == '(') {
+            } else if (
+                ctx->input_text[0] == '('
+                || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit9") == 0)
+            ) {
                 // open paren (create group)
                 if (TextState_IsSelecting(ex->TextState)) {
                     ConvertRangeToGroup(selectedUnits);
@@ -261,27 +267,49 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                     UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_GROUP);
                     mu_set_focus(ctx, mu_get_id_noidstack(ctx, &newUnit->Contents.Group->Regex->UnionMembers[0], sizeof(NoUnionEx*)));
                 }
-            } else if (ctx->input_text[0] == ')') {
+            } else if (
+                ctx->input_text[0] == ')'
+                || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit0") == 0)
+            ) {
                 // close paren (leave group)
                 if (parentEx) {
                     mu_set_focus(ctx, mu_get_id_noidstack(ctx, &parentEx, sizeof(NoUnionEx*)));
                     parentEx->TextState = TextState_SetCursorIndex(parentUnit->Index, 1);
                 }
-            } else if (ctx->input_text[0] == '.') {
+            } else if (
+                ctx->input_text[0] == '.'
+                || strcmp(ctx->input_keycode, "Period") == 0
+            ) {
                 newUnit = Unit_init(RE_NEW(Unit));
                 UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
                 newUnit->Contents.Special.Type = RE_SPECIAL_ANY;
-            } else if (ctx->input_text[0] == '^') {
+            } else if (
+                ctx->input_text[0] == '^'
+                || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit6") == 0)
+            ) {
                 newUnit = Unit_init(RE_NEW(Unit));
                 UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
                 newUnit->Contents.Special.Type = RE_SPECIAL_STRINGSTART;
-            } else if (ctx->input_text[0] == '$') {
+            } else if (
+                ctx->input_text[0] == '$'
+                || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit4") == 0)
+            ) {
                 newUnit = Unit_init(RE_NEW(Unit));
                 UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
                 newUnit->Contents.Special.Type = RE_SPECIAL_STRINGEND;
-            } else if (ctx->input_text[0] == '?'
-                        || ctx->input_text[0] == '+'
-                        || ctx->input_text[0] == '*'
+            } else if (
+                (
+                    ctx->input_text[0] == '?'
+                    || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Slash") == 0)
+                )
+                || (
+                    ctx->input_text[0] == '+'
+                    || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Equal") == 0)
+                )
+                || (
+                    ctx->input_text[0] == '*'
+                    || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit8") == 0)
+                )
             ) {
                 Unit* repeatUnit = previousUnit;
                 if (selectedUnits.Ex) {
@@ -293,7 +321,19 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                     repeatUnit = ex->Units[selectedUnits.Start];
                 }
 
-                switch (ctx->input_text[0]) {
+                // Normalize all this jank keyboard shortcut stuff
+                char modifier = ctx->input_text[0];
+                if (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Slash") == 0) {
+                    modifier = '?';
+                }
+                if (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Equal") == 0) {
+                    modifier = '+';
+                }
+                if (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Digit8") == 0) {
+                    modifier = '*';
+                }
+
+                switch (modifier) {
                 case '?': {
                     if (repeatUnit->RepeatMin == 0 && repeatUnit->RepeatMax == 1) {
                         Unit_SetRepeatMin(repeatUnit, 1);
@@ -324,7 +364,10 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
                 }
 
                 ex->TextState = TextState_SetCursorRight(ex->TextState, 1);
-            } else if (ctx->input_text[0] == '|') {
+            } else if (
+                ctx->input_text[0] == '|'
+                || (ctx->key_down & MU_KEY_SHIFT && strcmp(ctx->input_keycode, "Backslash") == 0)
+            ) {
                 // pipe
                 NoUnionEx* newEx = NoUnionEx_init(RE_NEW(NoUnionEx));
                 MoveUnitsTo(
