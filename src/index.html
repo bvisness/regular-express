@@ -190,7 +190,7 @@
 		<div id="copytext"></div>
 	</div>
 
-	<script type="text/javascript">
+	<script>
 		const output = document.querySelector('#output');
 		const copyButton = document.querySelector('#copy');
 
@@ -205,7 +205,7 @@
 		});
 	</script>
 
-	<script type="text/javascript">
+	<script>
 		function dumpMem8(mem) {
 			console.log(new Uint8Array(mem.buffer));
 		}
@@ -295,7 +295,7 @@
 				}
 			);
 
-			const { instance: test } = await WebAssembly.instantiateStreaming(
+			const { instance: regex } = await WebAssembly.instantiateStreaming(
 				mainFetch,
 				{
 					env: {
@@ -391,8 +391,8 @@
 				}
 			);
 
-			console.log(test.exports);
-			window.regex = test.exports;
+			console.log(regex.exports);
+			window.regex = regex.exports;
 
 			let awake = false;
 			function wakeUp() {
@@ -406,24 +406,24 @@
 
 			window.addEventListener('mousemove', e => {
 				const containerRect = canvasContainer.getBoundingClientRect();
-				test.exports.mouseMove(e.clientX - containerRect.x, e.clientY - containerRect.y);
+				regex.exports.mouseMove(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();
 			});
 			window.addEventListener('mousedown', e => {
 				const containerRect = canvasContainer.getBoundingClientRect();
-				test.exports.mouseDown(e.clientX - containerRect.x, e.clientY - containerRect.y);
+				regex.exports.mouseDown(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();
 			});
 			window.addEventListener('mouseup', e => {
 				const containerRect = canvasContainer.getBoundingClientRect();
-				test.exports.mouseUp(e.clientX - containerRect.x, e.clientY - containerRect.y);
+				regex.exports.mouseUp(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();
 			});
 
 			function specialKeyEvent(downOrUp, e) {
 				e.preventDefault();
 
-				const func = downOrUp === 'down' ? test.exports.keyDown : test.exports.keyUp;
+				const func = downOrUp === 'down' ? regex.exports.keyDown : regex.exports.keyUp;
 
 				// MU_KEY_SHIFT        = (1 << 0),
 				// MU_KEY_CTRL         = (1 << 1),
@@ -477,8 +477,8 @@
 					|| e.code == 'KeyA'
 					|| e.code == 'KeyZ'
 				) {
-					putString(test.exports.textInputBuf, e.key);
-					test.exports.textInput();
+					putString(regex.exports.textInputBuf, e.key);
+					regex.exports.textInput();
 					e.preventDefault();
 				}
 				wakeUp();
@@ -492,10 +492,10 @@
 
 			window.addEventListener('paste', e => {
 				putString(
-					test.exports.textInputBuf,
+					regex.exports.textInputBuf,
 					e.clipboardData.getData('text/plain')
 				);
-				test.exports.textInput();
+				regex.exports.textInput();
 				wakeUp();
 			});
 			window.addEventListener('wheel', e => {
@@ -508,11 +508,11 @@
 					y *= 20;
 				}
 
-				test.exports.scroll(x, y);
+				regex.exports.scroll(x, y);
 				wakeUp();
 			});
 			window.addEventListener('blur', () => {
-				test.exports.blur();
+				regex.exports.blur();
 				wakeUp();
 			});
 
@@ -531,7 +531,7 @@
 				ctx.textBaseline = 'top';
 				ctx.font = `${14 * dpr}px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol`;
 				textHeight = ctx.measureText('NothinBelowTheBaseline').actualBoundingBoxDescent;
-				test.exports.setTextHeight(textHeight / dpr);
+				regex.exports.setTextHeight(textHeight / dpr);
 
 				wakeUp();
 			}
@@ -539,11 +539,11 @@
 			window.addEventListener('resize', () => { updateCanvasSize(); });
 
 			putString(
-				test.exports.initialRegexBuf,
+				regex.exports.initialRegexBuf,
 				// window.localStorage.getItem('outputRegex') || 'Hello'
 				defaultInitialRegex
 			);
-			test.exports.init();
+			regex.exports.init();
 
 			// TODO: The timer should probably have a cap or otherwise
 			// keep ticking in some other way. We have weird issues where
@@ -560,7 +560,7 @@
 					}
 
 					const currentTime = new Date().getTime() / 1000;
-					const animating = test.exports.frame(
+					const animating = regex.exports.frame(
 						canvas.width / dpr,
 						canvas.height / dpr,
 						header.getBoundingClientRect().width,
