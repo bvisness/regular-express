@@ -480,9 +480,11 @@ char* toString_Unit(char* base, Unit* unit) {
     } else {
         base = writeString(base, "{");
         base += sprintf(base, "%d", unit->RepeatMin);
-        base = writeString(base, ",");
-        if (unit->RepeatMax >= 0) {
-            base += sprintf(base, "%d", unit->RepeatMax);
+        if (unit->RepeatMin != unit->RepeatMax) {
+            base = writeString(base, ",");
+            if (unit->RepeatMax >= 0) {
+                base += sprintf(base, "%d", unit->RepeatMax);
+            }
         }
         base = writeString(base, "}");
     }
