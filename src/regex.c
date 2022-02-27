@@ -406,7 +406,9 @@ int frame(int width, int height, int contentWidth, float dt) {
 
 		drag = (DragContext) {0};
 
-		ctx->animating = 1;
+		if (ctx->mouse_released & MU_MOUSE_LEFT) {
+			ctx->animating = 1;
+		}
 	}
 
 	mu_end(ctx);
