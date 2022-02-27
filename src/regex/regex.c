@@ -275,14 +275,6 @@ void Group_PushUndo(Group* group) {
     Regex_PushUndo(group->Regex);
 }
 
-int Group_CanRender(Group* group) {
-    if (group->Type == RE_GROUP_NORMAL) {
-        return 1;
-    }
-
-    return 0;
-}
-
 mu_Id Set_GetID(Set* set) {
     return mu_get_id_noidstack(ctx, &set, sizeof(Set*));
 }

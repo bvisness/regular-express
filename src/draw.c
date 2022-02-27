@@ -180,8 +180,6 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
         WIRE_THICKNESS
     );
 
-    int finalMemberWireY = wireY;
-
     int leftConnectorX = origin.x + UNION_GUTTER_WIDTH/2;
     int rightConnectorX = origin.x + UNION_GUTTER_WIDTH + regex->UnionSize.w + UNION_GUTTER_WIDTH/2;
 
@@ -222,7 +220,6 @@ void drawRailroad_Regex(Regex* regex, Vec2i origin, int unitDepth) {
             -10
         );
 
-        finalMemberWireY = memberWireY;
         memberOrigin.y += UNION_VERTICAL_SPACING + member->Size.h;
     }
 
@@ -956,25 +953,19 @@ void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin) {
 void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected) {
     mu_Rect r = mu_rect(origin.x, origin.y, group->Size.w, group->Size.h);
 
-    if (Group_CanRender(group)) {
-        mu_draw_rounded_rect(
-            ctx,
-            r,
-            selected ? COLOR_SELECTED_BACKGROUND : COLOR_GROUP_BACKGROUND,
-            4
-        );
+    mu_draw_rounded_rect(
+        ctx,
+        r,
+        selected ? COLOR_SELECTED_BACKGROUND : COLOR_GROUP_BACKGROUND,
+        4
+    );
 
-        drawRailroad_Regex(
-            group->Regex,
-            (Vec2i) {
-                .x = origin.x,
-                .y = GROUP_VERTICAL_PADDING + origin.y,
-            },
-            unitDepth + 1
-        );
-    } else {
-        mu_draw_rect(ctx, r, selected ? COLOR_SELECTED_BACKGROUND : COLOR_UNKNOWN_CONSTRUCT_BACKGROUND);
-        mu_Vec2 pos = mu_position_text(ctx, UNKNOWN_CONSTRUCT_TEXT, mu_layout_next(ctx), NULL, MU_OPT_ALIGNCENTER);
-        draw_arbitrary_text(ctx, UNKNOWN_CONSTRUCT_TEXT, pos, COLOR_RE_TEXT);
-    }
+    drawRailroad_Regex(
+        group->Regex,
+        (Vec2i) {
+            .x = origin.x,
+            .y = GROUP_VERTICAL_PADDING + origin.y,
+        },
+        unitDepth + 1
+    );
 }

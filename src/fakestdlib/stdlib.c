@@ -43,3 +43,35 @@ void qsort(void* base, size_t nitems, size_t size, int (*compar)(const void *, c
 		}
 	}
 }
+
+int isspace(int c)
+{
+	return (
+		c == ' '
+		|| c == '\n'
+		|| c == '\t'
+		|| c == '\r'
+		|| c == '\v'
+	);
+}
+
+// from musl
+int isdigit(int c)
+{
+	return (unsigned)c-'0' < 10;
+}
+
+// from musl
+int atoi(const char *s)
+{
+	int n=0, neg=0;
+	while (isspace(*s)) s++;
+	switch (*s) {
+	case '-': neg=1;
+	case '+': s++;
+	}
+	/* Compute n as a negative number to avoid overflow on INT_MIN */
+	while (isdigit(*s))
+		n = 10*n - (*s++ - '0');
+	return neg ? n : -n;
+}

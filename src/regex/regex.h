@@ -176,7 +176,6 @@ typedef struct Group {
 } Group;
 
 void Group_PushUndo(Group* group);
-int Group_CanRender(Group* group);
 
 typedef struct Set {
     int NumItems;

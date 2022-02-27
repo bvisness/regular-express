@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 
 #include "parser.h"
 #include "alloc.h"
@@ -73,7 +74,7 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
                     } break;
                     default: {
                         // named group!
-                        // for now, assume that the first occurrence of > is the end, screw escaping
+                        // TODO: for now, assume that the first occurrence of > is the end, screw escaping
                         groupType = RE_GROUP_NAMED;
 
                         groupNameStart = *i;
@@ -135,6 +136,73 @@ Regex* parseRegex(char* regexStr, int* i, int len) {
             Unit* lastUnit = ex->Units[ex->NumUnits - 1];
             Unit_SetRepeatMin(lastUnit, 0);
             Unit_SetRepeatMax(lastUnit, 1);
+        } else if (c == '{') {
+            (*i)++;
+
+            int firstBound = 0;
+            int secondBound = 0;
+            int hasComma = 0;
+
+            char numBuf[16] = {0};
+            int len = 0;
+            while (len < 16) {
+                if (regexStr[*i] == ',' || regexStr[*i] == '}') {
+                    break;
+                }
+                if (!isdigit(regexStr[*i])) {
+                    // malformed; quit
+                    // TODO(parse errors)
+                    break;
+                }
+                numBuf[len] = regexStr[*i];
+
+                len++;
+                (*i)++;
+            }
+
+            // parse and store the first number
+            firstBound = atoi(numBuf);
+
+            if (regexStr[*i] == ',') {
+                // unbounded max, or max to follow
+                hasComma = 1;
+                (*i)++;
+
+                if (regexStr[*i] == '}') {
+                    // unbounded max
+                    // max = 0 is fine
+                } else {
+                    // hard maximum
+                    len = 0;
+                    memset(numBuf, 0, 16);
+
+                    while (len < 16) {
+                        if (regexStr[*i] == '}') {
+                            break;
+                        }
+                        if (!isdigit(regexStr[*i])) {
+                            // malformed; quit
+                            // TODO(parse errors)
+                            break;
+                        }
+                        numBuf[len] = regexStr[*i];
+
+                        len++;
+                        (*i)++;
+                    }
+
+                    secondBound = atoi(numBuf);
+                }
+            }
+
+            Unit* lastUnit = ex->Units[ex->NumUnits - 1];
+            if (hasComma) {
+                lastUnit->RepeatMin = firstBound;
+                lastUnit->RepeatMax = secondBound;
+            } else {
+                lastUnit->RepeatMin = firstBound;
+                lastUnit->RepeatMax = firstBound;
+            }
         } else if (c == '^') {
             Unit* newUnit = Unit_init(RE_NEW(Unit));
             UnitContents_SetType(&newUnit->Contents, RE_CONTENTS_SPECIAL);
@@ -231,6 +299,7 @@ Unit* parseSet(char* regexStr, int* i, int len) {
 
         if (*i == len - 1 && c != ']') {
             // malformed regex, quit
+            // TODO(parse errors)
             break;
         }
 
