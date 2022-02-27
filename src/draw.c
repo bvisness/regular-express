@@ -841,9 +841,11 @@ void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin) {
             SET_ONEOF_HEIGHT - 2
         );
         mu_layout_set_next(ctx, rect, 0);
+        mu_push_id_raw(ctx, muid);
         if (mu_button(ctx, oneofStr)) {
             set->IsNegative = !set->IsNegative;
         }
+        mu_pop_id(ctx);
     }
 
     int itemX = origin.x + parent->Size.w/2 - set->ItemsSize.w/2;
