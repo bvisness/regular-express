@@ -860,7 +860,7 @@ void drawRailroad_Set(Set* set, UnitContents* parent, Vec2i origin) {
         int selected = TextState_IsSelected(set->TextState, i);
 
         mu_Rect itemRect = mu_rect(itemX, itemY, item->Size.w, item->Size.h);
-        mu_draw_rect(ctx, itemRect, selected ? COLOR_SELECTED_BACKGROUND : mu_color(160, 160, 160, 255));
+        mu_draw_rect(ctx, itemRect, selected ? COLOR_SELECTED_BACKGROUND : COLOR_SET_ITEM_BACKGROUND);
 
         if (item->Type == RE_SETITEM_LITCHAR) {
             mu_layout_set_next(ctx, itemRect, 0);
@@ -960,7 +960,7 @@ void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected)
         mu_draw_rounded_rect(
             ctx,
             r,
-            selected ? COLOR_SELECTED_BACKGROUND : mu_color(0, 0, 0, 25),
+            selected ? COLOR_SELECTED_BACKGROUND : COLOR_GROUP_BACKGROUND,
             4
         );
 

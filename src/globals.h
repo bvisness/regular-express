@@ -51,7 +51,9 @@ extern void setOutput(char* text);
 #define COLOR_RE_TEXT_DIM (mu_Color) { 140, 140, 140, 255 }
 #define COLOR_WIRE (mu_Color) { 50, 50, 50, 255 }
 #define COLOR_CURSOR (mu_Color) { 45, 83, 252, 255 }
-#define COLOR_UNIT_BACKGROUND (mu_Color) { 200, 200, 200, 255 }
+#define COLOR_UNIT_BACKGROUND (mu_Color) { 220, 220, 220, 255 }
+#define COLOR_SET_ITEM_BACKGROUND (mu_Color) { 180, 180, 180, 255 }
+#define COLOR_GROUP_BACKGROUND (mu_Color) { 0, 0, 0, 20 }
 #define COLOR_METACHAR_BACKGROUND (mu_Color) { 188, 170, 224, 255 }
 #define COLOR_SPECIAL_BACKGROUND (mu_Color) { 170, 225, 170, 255 }
 #define COLOR_SELECTED_BACKGROUND (mu_Color) { 122, 130, 255, 255 }

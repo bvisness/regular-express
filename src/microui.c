@@ -55,20 +55,20 @@ static mu_Style default_style = {
   /* title_height | scrollbar_size | thumb_size */
   24, 12, 8,
   {
-    { 230, 230, 230, 255 }, /* MU_COLOR_TEXT */
-    { 25,  25,  25,  255 }, /* MU_COLOR_BORDER */
-    { 50,  50,  50,  255 }, /* MU_COLOR_WINDOWBG */
+    { 0,   0,   0,   255 }, /* MU_COLOR_TEXT */
+    { 80,  80,  80,  255 }, /* MU_COLOR_BORDER */
+    { 165, 165, 165, 255 }, /* MU_COLOR_WINDOWBG */
     { 25,  25,  25,  255 }, /* MU_COLOR_TITLEBG */
     { 240, 240, 240, 255 }, /* MU_COLOR_TITLETEXT */
     { 0,   0,   0,   0   }, /* MU_COLOR_PANELBG */
-    { 75,  75,  75,  255 }, /* MU_COLOR_BUTTON */
-    { 95,  95,  95,  255 }, /* MU_COLOR_BUTTONHOVER */
-    { 115, 115, 115, 255 }, /* MU_COLOR_BUTTONFOCUS */
-    { 30,  30,  30,  255 }, /* MU_COLOR_BASE */
-    { 35,  35,  35,  255 }, /* MU_COLOR_BASEHOVER */
-    { 40,  40,  40,  255 }, /* MU_COLOR_BASEFOCUS */
-    { 43,  43,  43,  255 }, /* MU_COLOR_SCROLLBASE */
-    { 30,  30,  30,  255 }  /* MU_COLOR_SCROLLTHUMB */
+    { 220, 220, 220, 255 }, /* MU_COLOR_BUTTON */
+    { 240, 240, 240, 255 }, /* MU_COLOR_BUTTONHOVER */
+    { 220, 220, 220, 255 }, /* MU_COLOR_BUTTONFOCUS */
+    { 200, 200, 200, 255 }, /* MU_COLOR_BASE */
+    { 220, 220, 220, 255 }, /* MU_COLOR_BASEHOVER */
+    { 210, 210, 210, 255 }, /* MU_COLOR_BASEFOCUS */
+    { 80,  80,  80,  255 }, /* MU_COLOR_SCROLLBASE */
+    { 130, 130, 130, 255 }  /* MU_COLOR_SCROLLTHUMB */
   }
 };
 
