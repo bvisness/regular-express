@@ -1,6 +1,6 @@
 #include "prepass.h"
 
-void prepass_Regex(Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
+void prepass_Regex(PrepassContext* pctx, Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
     assert(regex != NULL);
 
     int w = 0;
@@ -27,7 +27,7 @@ void prepass_Regex(Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
 
     for (int i = 0; i < regex->NumUnionMembers; i++) {
         NoUnionEx* member = regex->UnionMembers[i];
-        prepass_NoUnionEx(member, regex, parentEx, parentUnit);
+        prepass_NoUnionEx(pctx, member, regex, parentEx, parentUnit);
 
         w = imax(w, member->Size.w);
         h += (i != 0 ? UNION_VERTICAL_SPACING : 0) + member->Size.h;
@@ -48,7 +48,7 @@ void prepass_Regex(Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
     regex->WireHeight = wireHeight;
 }
 
-void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
+void prepass_NoUnionEx(PrepassContext* pctx, NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* parentUnit) {
     mu_Id muid = NoUnionEx_GetID(ex);
 
     if (ctx->focus == muid) {
@@ -502,7 +502,7 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
 
     for (int i = 0; i < ex->NumUnits; i++) {
         Unit* unit = ex->Units[i];
-        prepass_Unit(unit, ex);
+        prepass_Unit(pctx, unit, ex);
 
         w += unit->Size.w;
         h = imax(h, unit->Size.h);
@@ -520,9 +520,9 @@ void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* p
     ex->WireHeight = wireHeight;
 }
 
-void prepass_Unit(Unit* unit, NoUnionEx* ex) {
+void prepass_Unit(PrepassContext* pctx, Unit* unit, NoUnionEx* ex) {
     UnitContents* contents = &unit->Contents;
-    prepass_UnitContents(contents, ex, unit);
+    prepass_UnitContents(pctx, contents, ex, unit);
 
     int attachmentWidth = Unit_IsNonSingular(unit) ? UNIT_WIRE_ATTACHMENT_ZONE_WIDTH : 0;
 
@@ -537,7 +537,7 @@ void prepass_Unit(Unit* unit, NoUnionEx* ex) {
     unit->WireHeight = UNIT_REPEAT_WIRE_ZONE_HEIGHT + contents->WireHeight;
 }
 
-void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
+void prepass_UnitContents(PrepassContext* pctx, UnitContents* contents, NoUnionEx* ex, Unit* unit) {
     switch (contents->Type) {
         case RE_CONTENTS_LITCHAR: {
             contents->Size = (Vec2i) { .w = UNIT_CONTENTS_LITCHAR_WIDTH, .h = UNIT_CONTENTS_MIN_HEIGHT };
@@ -560,7 +560,7 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
         case RE_CONTENTS_SET: {
             Set* set = contents->Set;
 
-            prepass_Set(set, ex, unit);
+            prepass_Set(pctx, set, ex, unit);
 
             // calculate sizes
             Vec2i contentsSize = {
@@ -598,7 +598,7 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
         } break;
         case RE_CONTENTS_GROUP: {
             Group* group = contents->Group;
-            prepass_Group(group, ex, unit);
+            prepass_Group(pctx, group, ex, unit);
             contents->Size = group->Size;
             contents->WireHeight = group->WireHeight;
         } break;
@@ -610,7 +610,7 @@ void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit) {
     }
 }
 
-void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
+void prepass_Set(PrepassContext* pctx, Set* set, NoUnionEx* ex, Unit* unit) {
     mu_Id muid = mu_get_id_noidstack(ctx, &set, sizeof(Set*));
 
     if (ctx->focus == muid) {
@@ -760,9 +760,14 @@ void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit) {
     }
 }
 
-void prepass_Group(Group* group, NoUnionEx* ex, Unit* unit) {
+void prepass_Group(PrepassContext* pctx, Group* group, NoUnionEx* ex, Unit* unit) {
+    if (group->Type == RE_GROUP_NORMAL || group->Type == RE_GROUP_NAMED) {
+        pctx->GroupNumber++;
+        group->Number = pctx->GroupNumber;
+    }
+
     Regex* regex = group->Regex;
-    prepass_Regex(regex, ex, unit);
+    prepass_Regex(pctx, regex, ex, unit);
 
     group->Size = (Vec2i) {
         .w = regex->Size.w,

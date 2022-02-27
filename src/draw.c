@@ -960,6 +960,10 @@ void drawRailroad_Group(Group* group, Vec2i origin, int unitDepth, int selected)
         4
     );
 
+    char buf[16];
+    sprintf(buf, "%d", group->Number);
+    draw_arbitrary_text(ctx, buf, mu_vec2(origin.x, origin.y), COLOR_RE_TEXT);
+
     drawRailroad_Regex(
         group->Regex,
         (Vec2i) {

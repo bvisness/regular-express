@@ -169,7 +169,9 @@ typedef struct Group {
     int Type;
     struct Regex* Regex;
 
+    int Number;
     char Name[128];
+    // char FormattedName[256];
 
     Vec2i Size;
     int WireHeight;

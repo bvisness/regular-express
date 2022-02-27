@@ -130,8 +130,8 @@ int frame(int width, int height, int contentWidth, float dt) {
 	UNDOPUSH(ctx->focus);
 	Regex_PushUndo(regex);
 
-	prepass_Regex(regex, NULL, NULL);
-	prepass_NoUnionEx(&moveUnitsEx, NULL, NULL, NULL);
+	prepass_Regex(&(PrepassContext){0}, regex, NULL, NULL);
+	prepass_NoUnionEx(&(PrepassContext){0}, &moveUnitsEx, NULL, NULL, NULL);
 
 	int guiHeight = height - WINDOW_PADDING - TOOLBAR_HEIGHT;
 	int windowX = 0;

@@ -9,9 +9,13 @@
 
 #include "util/math.h"
 
-void prepass_Regex(Regex* regex, NoUnionEx* parentEx, Unit* parentUnit);
-void prepass_NoUnionEx(NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* parentUnit);
-void prepass_Unit(Unit* unit, NoUnionEx* ex);
-void prepass_UnitContents(UnitContents* contents, NoUnionEx* ex, Unit* unit);
-void prepass_Set(Set* set, NoUnionEx* ex, Unit* unit);
-void prepass_Group(Group* group, NoUnionEx* ex, Unit* unit);
+typedef struct {
+    int GroupNumber;
+} PrepassContext;
+
+void prepass_Regex(PrepassContext* pctx, Regex* regex, NoUnionEx* parentEx, Unit* parentUnit);
+void prepass_NoUnionEx(PrepassContext* pctx, NoUnionEx* ex, Regex* regex, NoUnionEx* parentEx, Unit* parentUnit);
+void prepass_Unit(PrepassContext* pctx, Unit* unit, NoUnionEx* ex);
+void prepass_UnitContents(PrepassContext* pctx, UnitContents* contents, NoUnionEx* ex, Unit* unit);
+void prepass_Set(PrepassContext* pctx, Set* set, NoUnionEx* ex, Unit* unit);
+void prepass_Group(PrepassContext* pctx, Group* group, NoUnionEx* ex, Unit* unit);
