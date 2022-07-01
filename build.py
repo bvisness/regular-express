@@ -64,6 +64,7 @@ subprocess.run([
     '-o', 'regex.wasm',
     '-O2', # general perf optimizations
     '--memory-packing', # remove unnecessary and extremely large .bss segment
+    '--zero-filled-memory',
 ])
 
 # Produce a WAT version of the code for inspection.
