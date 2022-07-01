@@ -7,6 +7,9 @@ import subprocess
 import random
 import shutil
 import string
+import sys
+
+RELEASE = len(sys.argv) > 1 and sys.argv[1] == 'release'
 
 clang = 'clang'
 wasmld = 'wasm-ld'
@@ -23,10 +26,10 @@ try:
 except FileNotFoundError:
     pass
 
-try:
-    shutil.rmtree('build')
-except:
-    pass
+[os.remove(f) for f in glob.iglob('build/dist/*', recursive=True)]
+for ext in ['*.o', '*.wasm', '*.wat']:
+    [os.remove(f) for f in glob.iglob('build/**/' + ext, recursive=True)]
+
 os.makedirs('build', exist_ok=True)
 os.chdir('build')
 
@@ -38,16 +41,21 @@ flags = [
     '-Wall', '-Wno-builtin-requires-header',
 ]
 
+print('Compiling .wat files:')
 for watfile in glob.glob('../src/**/*.wat', recursive=True):
+    print('- ' + watfile)
     subprocess.run(['wat2wasm', watfile])
 
+print('Compiling .c files:')
 ofiles = []
 for cfile in glob.glob('../src/**/*.c', recursive=True):
     safename = re.sub(r'[^a-zA-Z0-9]', '_', cfile[0:-2])
     ofile = safename + '.o'
+    print('- ' + cfile)
     subprocess.run([clang] + flags + ['-o', ofile, cfile])
     ofiles.append(ofile)
 
+print('Linking...')
 subprocess.run([
     wasmld,
     '--no-entry',
@@ -59,21 +67,21 @@ subprocess.run([
 ] + ofiles)
 
 # Optimize output WASM file
-subprocess.run([
-    'wasm-opt', 'regex.wasm',
-    '-o', 'regex.wasm',
-    '-O2', # general perf optimizations
-    '--memory-packing', # remove unnecessary and extremely large .bss segment
-    '--zero-filled-memory',
-])
-
-# Produce a WAT version of the code for inspection.
-subprocess.run(['wasm2wat', 'regex.wasm', '-o', 'regex.wat'])
+if RELEASE:
+    print('Optimizing WASM...')
+    subprocess.run([
+        'wasm-opt', 'regex.wasm',
+        '-o', 'regex.wasm',
+        '-O2', # general perf optimizations
+        '--memory-packing', # remove unnecessary and extremely large .bss segment
+        '--zero-filled-memory',
+    ])
 
 #
 # Output the dist folder for upload
 #
 
+print('Building dist folder...')
 os.chdir('..')
 os.makedirs('build/dist', exist_ok=True)
 
@@ -102,3 +110,12 @@ for asset in assets:
 
 with open('build/dist/index.html', 'w') as f:
     f.write(rootContents)
+
+# Produce a WAT version of the code for inspection.
+if not RELEASE:
+    os.chdir('build')
+    print('Producing .wat files...')
+    subprocess.run(['wasm2wat', 'regex.wasm', '-o', 'regex.wat'])
+    os.chdir('..')
+
+print('Done!')

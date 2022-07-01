@@ -22,7 +22,10 @@
             "command": "python",
             "args": [
                 "build.py"
-            ]
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+            }
         },
         {
             "label": "Launch Server",
@@ -32,10 +35,10 @@
                 "-m",
                 "http.server"
             ],
-            "problemMatcher": [],
             "options": {
-                "cwd": "${workspaceFolder}/build/dist"
-            }
+                "cwd": "${workspaceFolder}/build/dist",
+            },
+            "problemMatcher": [],
         }
     ]
 }
