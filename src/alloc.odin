@@ -1,11 +1,9 @@
-package alloc
+package main
 
 import "core:fmt"
 import "core:intrinsics"
 import "core:mem"
 import "core:runtime"
-
-import "../host"
 
 // bill I am BEGGING you to include something useful by default for wasm
 
@@ -14,11 +12,6 @@ import "../host"
 // this is copy-pasted from spall
 
 PAGE_SIZE :: 64 * 1024
-
-Error :: enum int {
-    NoError = 0,
-    OutOfMemory = 1,
-}
 
 page_alloc :: proc(page_count: uint) -> (data: []byte, err: mem.Allocator_Error) {
 	prev_page_count := intrinsics.wasm_memory_grow(0, uintptr(page_count))
@@ -75,7 +68,7 @@ arena_allocator_proc :: proc(
 
 		if uint(arena.offset) + uint(total_size) > uint(len(arena.data)) {
 			fmt.printf("Out of memory @ %s\n", location)
-			host.die(int(Error.OutOfMemory))
+			die(CrashError.OutOfMemory)
 		}
 
 		arena.offset = int(uint(arena.offset) + uint(total_size))
@@ -116,7 +109,7 @@ growing_arena_init :: proc(a: ^Arena, loc := #caller_location) {
 	chunk, err := page_alloc(10)
 	if err != nil {
 		fmt.printf("OOM'd @ init | %s %s\n", err, loc)
-		host.die(int(Error.OutOfMemory))
+		die(CrashError.OutOfMemory)
 	}
 
 	a.data       = chunk
@@ -165,7 +158,7 @@ growing_arena_allocator_proc :: proc(
 				fmt.printf("tried to get %f MB\n", f64(u32(total_size)) / 1024 / 1024)
 				fmt.printf("OOM'd @ %f MB | %s\n", f64(u32(len(arena.data))) / 1024 / 1024, location)
 
-				host.die(int(Error.OutOfMemory))
+				die(CrashError.OutOfMemory)
 			}
 
 			head_ptr := raw_data(arena.data)

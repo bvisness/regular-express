@@ -5,13 +5,9 @@ import "core:mem"
 import "core:runtime"
 import "vendor:wasm/js"
 
-import "alloc"
-import "host"
-import "undo"
-
 // allocator state
-global_arena := alloc.Arena{}
-temp_arena := alloc.Arena{}
+global_arena := Arena{}
+temp_arena := Arena{}
 
 global_allocator: mem.Allocator
 temp_allocator: mem.Allocator
@@ -23,14 +19,14 @@ main :: proc() {
 	ONE_MB_PAGES :: 1 * 1024 * 1024 / js.PAGE_SIZE
 	temp_data, _ := js.page_alloc(ONE_MB_PAGES * 20)
 
-	alloc.arena_init(&temp_arena, temp_data)
+	arena_init(&temp_arena, temp_data)
 
 	// This must be init last, because it grows infinitely.
 	// We don't want it accidentally growing into anything useful.
-	alloc.growing_arena_init(&global_arena)
+	growing_arena_init(&global_arena)
 
-	temp_allocator = alloc.arena_allocator(&temp_arena)
-	global_allocator = alloc.growing_arena_allocator(&global_arena)
+	temp_allocator = arena_allocator(&temp_arena)
+	global_allocator = growing_arena_allocator(&global_arena)
 
 	wasm_context.allocator = global_allocator
 	wasm_context.temp_allocator = temp_allocator
@@ -43,5 +39,5 @@ foo :: proc "contextless" () {
     context = wasm_context
 
     fmt.println("foo")
-    host.bar(4, "haldo")
+    bar(4, "haldo")
 }

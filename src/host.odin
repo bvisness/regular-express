@@ -1,4 +1,4 @@
-package host
+package main
 
 import "core:intrinsics"
 
@@ -14,7 +14,12 @@ trap :: proc "contextless" () -> ! {
 	intrinsics.trap()
 }
 
-die :: proc(code: int) -> ! {
-    set_error_code(code)
+CrashError :: enum int {
+    NoError = 0,
+    OutOfMemory = 1,
+}
+
+die :: proc(code: CrashError) -> ! {
+    set_error_code(int(code))
     trap()
 }

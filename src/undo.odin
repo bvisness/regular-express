@@ -1,4 +1,4 @@
-package undo
+package main
 
 import "core:fmt"
 import "core:intrinsics"
