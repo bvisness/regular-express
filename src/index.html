@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="UTF-8">
+	<title>Regular Express</title>
+
+	<script src="runtime.js"></script>
+	<script>
+		(async () => {
+			window.wasm = await odin.runWasm('regex.wasm', null, {
+				host: {
+					bar(bleh, p, len) { console.log('bar', window.wasm.odinMem.loadString(p, len)) },
+					set_error_code(code) { window.errorCode = code },
+				},
+			});
+		})();
+	</script>
+
+	<link rel="stylesheet" href="normalize.css">
+
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol;
+		}
+
+		.ui-container {
+			height: 100vh;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.below-the-fold {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			padding-top: 1rem;
+			padding-bottom: 4rem;
+		}
+
+		header {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 3.4rem;
+			border-bottom: 1px solid #ccc;
+			margin-bottom: 0.6rem;
+		}
+
+		header h1 {
+			display: inline-block;
+			margin: 0;
+			font-weight: 600;
+		}
+
+		.tagline-container {
+			display: inline-flex;
+			align-items: center;
+			width: 0;
+			height: 3rem;
+			position: relative;
+		}
+
+		.tagline {
+			position: absolute;
+			right: 1rem;
+			white-space: nowrap;
+			font-style: italic;
+			color: #999;
+		}
+
+		.canvas-container {
+			flex-grow: 1;
+			width: 100%;
+			position: relative;
+		}
+
+		canvas, .error-output {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+		}
+
+		.error-output {
+			background-color: white;
+			text-align: center;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			padding: 2rem;
+		}
+
+		.error-output h2 {
+			color: red;
+		}
+
+		.site-width {
+			width: calc(100% - 1.2rem);
+			max-width: 64rem;
+		}
+
+		.regex-preview {
+			display: flex;
+			height: 4rem;
+			padding-top: 0.6rem;
+		}
+
+		#output {
+			flex-grow: 1;
+			border: 1px solid #ccc;
+			padding: 0 0.6rem;
+		}
+
+		#copy {
+			width: 10rem;
+			border: 1px solid #ccc;
+			margin-left: 0.6rem;
+		}
+
+		#invisible {
+			position: absolute;
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.hide {
+			display: none;
+		}
+
+		p, ol, ul {
+			line-height: 1.5;
+		}
+
+		li {
+			margin-bottom: 0.2em;
+		}
+
+		.more-info {
+			color: #999;
+			padding: 1.2rem 0;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="ui-container">
+		<header class="site-width">
+			<span class="tagline-container">
+				<span class="tagline">all aboard the</span>
+			</span>
+			<h1>🚂 Regular Express 🚂</h1>
+		</header>
+		<div class="canvas-container">
+			<canvas></canvas>
+			<div class="error-output hide">
+				<h2>Sorry, the train has jumped the tracks.</h2>
+				<p>The program has crashed. If you have time, please <a href="https://github.com/bvisness/regular-express/issues" target="_blank">create a GitHub issue</a> describing what you were doing when it crashed.</p>
+			</div>
+		</div>
+		<div class="regex-preview site-width">
+			<input id="output">
+			<button id="copy">Copy</button>
+		</div>
+		<div class="more-info">
+			scroll down for more info
+		</div>
+	</div>
+
+	<div class="below-the-fold">
+		<div class="site-width">
+			<h2>What is this?</h2>
+
+			<p>Regular Express lets you build regular expressions without ever touching the syntax. It supports the features and syntax of JavaScript regular expressions.</p>
+
+			<p>Things you can do:</p>
+			<ul>
+				<li>Type any text to have it recognized (it will automatically be escaped if necessary).</li>
+				<li>Hover over the text to expose wire handles. Drag from handle to handle to skip parts of the text or make it repeat.</li>
+				<li>Turn your selection into a group by clicking Make Group.</li>
+				<li>Click the + button to add an alternate pattern to match.</li>
+				<li>Add a character set by clicking the Character Set button. (This will recognize a single character matching the ones you provide.)</li>
+				<li>Type a dash in a character set to recognize a range of characters (e.g. <code>a-z</code> to recognize lowercase letters.)</li>
+				<li>Recognize common groups of characters like digits and whitespace by using the "Special Character" and "Common Sets" tools.</li>
+				<li>If you already know regex syntax, quickly input special regex characters, group, sets, etc. by holding the Alt key. For example, pressing Alt-? will make the item before the cursor optional, and pressing Alt-[ will create a character set.</li>
+			</ul>
+
+			<p>It is currently in an alpha state, so expect bugs! There are also some features not yet supported - you can see the project roadmap <a href="https://www.notion.so/bvisness/3708fea1fb9d43f1b51b7512d685f963?v=c0b80b9cebc843f5b95dac1370bfa76b" target="_blank">here</a>.</p>
+
+			<p>Please let me know <a href="https://github.com/bvisness/regular-express/issues" target="_blank">in a GitHub issue</a> if you run into issues, find things confusing, or have any other feedback.</p>
+		</div>
+	</div>
+
+	<div id="invisible">
+		<div id="copytext"></div>
+	</div>
+
+	<script>
+		const output = document.querySelector('#output');
+		const copyButton = document.querySelector('#copy');
+
+		output.addEventListener('change', e => {
+			e.preventDefault();
+		});
+		copyButton.addEventListener('click', () => {
+			navigator.clipboard.writeText(output.value)
+				.then(() => {
+					console.log("successfully copied");
+				});
+		});
+	</script>
+
+	<script>
+		function dumpMem8(mem) {
+			console.log(new Uint8Array(mem.buffer));
+		}
+
+		function dumpMem32(mem) {
+			console.log(new Uint32Array(mem.buffer));
+		}
+	</script>
+	<script type="module">
+		const header = document.querySelector('header');
+		const canvasContainer = document.querySelector('.canvas-container');
+		const canvas = document.querySelector('canvas');
+		const ctx = canvas.getContext('2d');
+
+		let dpr;
+		let textHeight;
+
+		const defaultInitialRegex = 'Hello';
+
+		async function init() {
+			const mem = new WebAssembly.Memory({
+				initial: 256,
+			});
+			const memBuf = new Uint8Array(mem.buffer);
+			for (let i = 0; i < 1024; i++) {
+				memBuf[i] = 0b10101010;
+			}
+
+			window.mem = mem;
+
+			window.findNonZero = mem => {
+				let currentSection = [];
+				const buf = new Uint8Array(mem.buffer)
+
+				for (let i = 0; i < buf.length; i++) {
+					const v = buf[i];
+					if (v) {
+						currentSection.push(v);
+					} else {
+						if (currentSection.length) {
+							console.log(i, currentSection);
+							currentSection = [];
+						}
+					}
+				}
+
+				if (currentSection.length) {
+					console.log(currentSection);
+				}
+			}
+
+			function getString(ptr, len = null) {
+				const codes = [];
+				const buf = new Uint8Array(mem.buffer);
+
+				for (let i = 0; len === null || i < len; i++) {
+					const char = buf[ptr];
+					if (!char) {
+						break;
+					} else {
+						codes.push(char);
+						ptr++;
+					}
+				}
+
+				return String.fromCharCode(...codes);
+			}
+
+			function putString(ptr, str) {
+				const buf = new Uint8Array(mem.buffer);
+				let i = 0;
+				for (; i < str.length; i++) {
+					buf[ptr + i] = str.charCodeAt(i);
+				}
+				buf[ptr + i] = 0;
+			}
+
+			const sysFetch = fetch("sys.wasm");
+			const mainFetch = fetch("regex.wasm");
+
+			const { instance: sys } = await WebAssembly.instantiateStreaming(
+				sysFetch,
+				{
+					env: {
+						memory: mem,
+					}
+				}
+			);
+
+			const { instance: regex } = await WebAssembly.instantiateStreaming(
+				mainFetch,
+				{
+					env: {
+						memory: mem,
+						...sys.exports,
+						printInt: console.log,
+						printLong: console.log,
+						printDouble: console.log,
+						printString: ptr => console.log(getString(ptr)),
+						printError: ptr => console.error(getString(ptr)),
+						breakpoint: () => { debugger; },
+
+						canvas_clear: () => {
+							ctx.clearRect(0, 0, canvas.width, canvas.height);
+						},
+						canvas_clip: (x, y, w, h) => {
+							ctx.restore();
+							ctx.save();
+							ctx.beginPath();
+							ctx.rect(x * dpr, y * dpr, w * dpr, h * dpr);
+							ctx.clip();
+						},
+						canvas_rect: (x, y, w, h, r, red, green, blue, alpha) => {
+							r = Math.min(r, w / 2, h / 2);
+
+							const dx = x * dpr;
+							const dy = y * dpr;
+							const dr = r * dpr;
+
+							const diw = (w - (2 * r)) * dpr; // device inner width
+							const dih = (h - (2 * r)) * dpr; // device inner height
+
+							ctx.beginPath();
+							ctx.moveTo(dx + dr, dy);
+							ctx.lineTo(dx + dr + diw, dy);
+							ctx.arc(dx + dr + diw, dy + dr, dr, -Math.PI/2, 0);
+							ctx.lineTo(dx + dr + diw + dr, dy + dr + dih);
+							ctx.arc(dx + dr + diw, dy + dr + dih, dr, 0, Math.PI/2);
+							ctx.lineTo(dx + dr, dy + dr + dih + dr);
+							ctx.arc(dx + dr, dy + dr + dih, dr, Math.PI/2, Math.PI);
+							ctx.lineTo(dx, dy + dr);
+							ctx.arc(dx + dr, dy + dr, dr, Math.PI, (3*Math.PI)/2);
+
+							ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha/255})`;
+							ctx.fill();
+						},
+						canvas_text: (strPtr, x, y, r, g, b, a) => {
+							const str = getString(strPtr);
+							ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+							ctx.fillText(str, x * dpr, y * dpr);
+						},
+						canvas_line: (x1, y1, x2, y2, r, g, b, a, strokeWidth) => {
+							ctx.beginPath();
+							ctx.moveTo(x1 * dpr, y1 * dpr);
+							ctx.lineTo(x2 * dpr, y2 * dpr);
+
+							ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
+							ctx.lineWidth = strokeWidth * dpr;
+							ctx.stroke();
+						},
+						canvas_arc: (x, y, radius, angleStart, angleEnd, r, g, b, a, strokeWidth) => {
+
+							ctx.beginPath();
+							ctx.arc(x * dpr, y * dpr, radius * dpr, -angleStart, -angleEnd - 0.001, true);
+							/*
+							The 0.001 is because Firefox has some dumb bug where
+							it doesn't draw all the way to the end of the arc and
+							leaves some empty pixels. Lines don't join up with arcs
+							nicely because of it. It sucks but a little bias seems
+							to "fix" it.
+
+							Bug report: https://bugzilla.mozilla.org/show_bug.cgi?id=1664959
+							*/
+
+							ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a/255})`;
+							ctx.lineWidth = strokeWidth * dpr;
+							ctx.stroke();
+						},
+
+						measureText: (strPtr, len) => {
+							const str = getString(strPtr, len);
+							const metrics = ctx.measureText(str);
+
+							return metrics.width / dpr;
+						},
+
+						setOutput: strPtr => {
+							const text = getString(strPtr);
+							output.value = text;
+							window.localStorage.setItem('outputRegex', text);
+						},
+					},
+				}
+			);
+
+			console.log(regex.exports);
+			window.regex = regex.exports;
+
+			let awake = false;
+			function wakeUp() {
+				if (awake) {
+					return;
+				}
+
+				awake = true;
+				window.requestAnimationFrame(doFrame);
+			}
+
+			window.addEventListener('mousemove', e => {
+				const containerRect = canvasContainer.getBoundingClientRect();
+				regex.exports.mouseMove(e.clientX - containerRect.x, e.clientY - containerRect.y);
+				wakeUp();
+			});
+			window.addEventListener('mousedown', e => {
+				const containerRect = canvasContainer.getBoundingClientRect();
+				regex.exports.mouseDown(e.clientX - containerRect.x, e.clientY - containerRect.y);
+				wakeUp();
+			});
+			window.addEventListener('mouseup', e => {
+				const containerRect = canvasContainer.getBoundingClientRect();
+				regex.exports.mouseUp(e.clientX - containerRect.x, e.clientY - containerRect.y);
+				wakeUp();
+			});
+
+			function specialKeyEvent(downOrUp, e) {
+				e.preventDefault();
+
+				const func = downOrUp === 'down' ? regex.exports.keyDown : regex.exports.keyUp;
+
+				// MU_KEY_SHIFT        = (1 << 0),
+				// MU_KEY_CTRL         = (1 << 1),
+				// MU_KEY_ALT          = (1 << 2),
+				// MU_KEY_BACKSPACE    = (1 << 3),
+				// MU_KEY_RETURN       = (1 << 4),
+				// MU_KEY_ARROWLEFT    = (1 << 5),
+				// MU_KEY_ARROWRIGHT   = (1 << 6),
+				// MU_KEY_ARROWUP      = (1 << 7),
+				// MU_KEY_ARROWDOWN    = (1 << 8),
+				// MU_KEY_DELETE       = (1 << 9),
+				// MU_KEY_HOME         = (1 << 10),
+				// MU_KEY_END          = (1 << 11),
+				// MU_KEY_TAB          = (1 << 12),
+
+				if (e.key === 'Shift') {
+					func(1 << 0);
+				} else if (e.key === 'Control' || e.key === 'Meta') {
+					func(1 << 1);
+				} else if (e.key === 'Alt') {
+					func(1 << 2);
+				} else if (e.key === 'Backspace') {
+					func(1 << 3);
+				} else if (e.key === 'Enter') {
+					func(1 << 4);
+				} else if (e.key === 'ArrowLeft') {
+					func(1 << 5);
+				} else if (e.key === 'ArrowRight') {
+					func(1 << 6);
+				} else if (e.key === 'ArrowUp') {
+					func(1 << 7);
+				} else if (e.key === 'ArrowDown') {
+					func(1 << 8);
+				} else if (e.key === 'Delete') {
+					func(1 << 9);
+				} else if (e.key === 'Home') {
+					func(1 << 10);
+				} else if (e.key === 'End') {
+					func(1 << 11);
+				} else if (e.key === 'Tab') {
+					func(1 << 12);
+				}
+
+				wakeUp();
+			}
+			window.addEventListener('keydown', e => {
+				if (e.key.length > 1) {
+					specialKeyEvent('down', e);
+				} else if (
+					!(e.ctrlKey || e.metaKey)
+					|| e.code == 'KeyA'
+					|| e.code == 'KeyZ'
+				) {
+					putString(regex.exports.textInputBuf, e.key);
+					putString(regex.exports.keyCodeBuf, e.code);
+					regex.exports.textInput();
+					e.preventDefault();
+				}
+				wakeUp();
+			});
+			window.addEventListener('keyup', e => {
+				if (e.key.length > 1) {
+					specialKeyEvent('up', e);
+				}
+				wakeUp();
+			});
+
+			window.addEventListener('paste', e => {
+				putString(
+					regex.exports.textInputBuf,
+					e.clipboardData.getData('text/plain')
+				);
+				regex.exports.textInput();
+				wakeUp();
+			});
+			window.addEventListener('wheel', e => {
+				let x = e.deltaX;
+				let y = e.deltaY;
+
+				if (e.deltaMode === 1) {
+					// "lines"
+					x *= 20;
+					y *= 20;
+				}
+
+				regex.exports.scroll(x, y);
+				wakeUp();
+			});
+			window.addEventListener('blur', () => {
+				regex.exports.blur();
+				wakeUp();
+			});
+
+			window.addEventListener('beforeunload', e => {
+				if (window.localStorage.getItem('outputRegex') != defaultInitialRegex) {
+					e.preventDefault();
+					e.returnValue = 'whatever dude';
+				}
+			});
+
+			function updateCanvasSize() {
+				dpr = window.devicePixelRatio;
+				canvas.width = canvasContainer.getBoundingClientRect().width * dpr;
+				canvas.height = canvasContainer.getBoundingClientRect().height * dpr;
+
+				ctx.textBaseline = 'top';
+				ctx.font = `${14 * dpr}px -apple-system,BlinkMacSystemFont,segoe ui,Helvetica,Arial,sans-serif,apple color emoji,segoe ui emoji,segoe ui symbol`;
+				textHeight = ctx.measureText('NothinBelowTheBaseline').actualBoundingBoxDescent;
+				regex.exports.setTextHeight(textHeight / dpr);
+
+				wakeUp();
+			}
+			updateCanvasSize();
+			window.addEventListener('resize', () => { updateCanvasSize(); });
+
+			putString(
+				regex.exports.initialRegexBuf,
+				// window.localStorage.getItem('outputRegex') || 'Hello'
+				defaultInitialRegex
+			);
+			regex.exports.init();
+
+			// TODO: The timer should probably have a cap or otherwise
+			// keep ticking in some other way. We have weird issues where
+			// the first mouse move after a while fast forwards time
+			// by a lot.
+			let lastTime = new Date().getTime() / 1000;
+			function doFrame() {
+				try {
+					const memBuf = new Uint8Array(mem.buffer);
+					for (let i = 0; i < 1024; i++) {
+						if (memBuf[i] != 0b10101010) {
+							console.error("WRITE TO PROTECTED MEMORY!", { index: i });
+						}
+					}
+
+					const currentTime = new Date().getTime() / 1000;
+					const animating = regex.exports.frame(
+						canvas.width / dpr,
+						canvas.height / dpr,
+						header.getBoundingClientRect().width,
+						currentTime - lastTime
+					);
+
+					lastTime = currentTime;
+
+					if (animating) {
+						window.requestAnimationFrame(doFrame);
+					} else {
+						awake = false;
+					}
+				} catch (error) {
+					console.error(error);
+					document.querySelector('.error-output').classList.toggle('hide', false);
+				}
+			}
+			wakeUp();
+		}
+		init();
+	</script>
+</body>
+
+</html>
