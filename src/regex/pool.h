@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "../llmv.h"
+
 // See https://www.gingerbill.org/article/2019/02/16/memory-allocation-strategies-004/
 
 #define POOL_SIZE 256
@@ -11,18 +13,18 @@ typedef struct PoolFreeNode PoolFreeNode;
 
 struct Pool {
     const char* name;
-    unsigned char *buf;
+    unsigned char* buf;
     size_t buf_len;
     size_t chunk_size;
 
     // int capacity; // always POOL_SIZE right now
     int count;
 
-    PoolFreeNode *head;
+    PoolFreeNode* head;
 };
 
 struct PoolFreeNode {
-    PoolFreeNode *next;
+    PoolFreeNode* next;
 };
 
 void pool_init(
@@ -36,5 +38,7 @@ void pool_init(
 void *pool_alloc(Pool *p);
 void pool_free(Pool *p, void *ptr);
 void pool_free_all(Pool *p);
+
+int pool_viz(Pool* p);
 
 #define POOL_INIT(type, poolPtr) pool_init(poolPtr, #type, malloc(sizeof(type) * POOL_SIZE), sizeof(type) * POOL_SIZE, sizeof(type))

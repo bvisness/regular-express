@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "pool.h"
+#include "../viz.h"
 
 void pool_init(
     Pool *p,
@@ -88,6 +89,7 @@ void pool_free_all(Pool *p) {
     size_t chunk_count = p->buf_len / p->chunk_size;
     size_t i;
 
+    p->head = NULL;
     p->count = 0;
 
     // Set all chunks to be free
@@ -98,4 +100,33 @@ void pool_free_all(Pool *p) {
         node->next = p->head;
         p->head = node;
     }
+}
+
+int pool_viz(Pool* p) {
+    llmv_writer w = llmv_new_writer(vizbuf(), VIZBUF_SIZE);
+
+    llmv_start_struct(&w, "Pool", p);
+    llmv_structfield(&w, p, name);
+    llmv_structfield(&w, p, buf);
+    llmv_structfield(&w, p, buf_len);
+    llmv_structfield(&w, p, chunk_size);
+    llmv_structfield(&w, p, count);
+    llmv_structfield(&w, p, head);
+    llmv_end(&w);
+
+    llmv_cstring(&w, p->name);
+
+    llmv_start(&w, "Pool_buf", p->buf, p->buf_len);
+    llmv_end(&w);
+
+    PoolFreeNode* n = p->head;
+    while (n) {
+        llmv_start(&w, "PoolFreeNode", n, p->chunk_size);
+        llmv_structfield(&w, n, next);
+        llmv_end(&w);
+
+        n = n->next;
+    }
+
+    return w.err;
 }
