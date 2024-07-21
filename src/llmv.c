@@ -2,6 +2,15 @@
 
 #include "llmv.h"
 
+typedef enum llmv_flag {
+    LLMV_EOF = 0xFF,
+
+    LLMV_START = 1,
+    LLMV_END = 2,
+
+    LLMV_FIELD = 3,
+} llmv_flag;
+
 int llmv_write_raw(llmv_writer *w, const void* pv, size_t size) {
     if (w->err) {
         return 1;
@@ -65,5 +74,10 @@ int llmv_field(llmv_writer* w, const char* name, const void* addr, size_t size) 
     llmv_write_ptr(w, addr);
     llmv_write_size(w, size);
     llmv_write_string(w, name);
+    return w->err;
+}
+
+int llmv_close(llmv_writer* w) {
+    llmv_write_flag(w, LLMV_EOF);
     return w->err;
 }

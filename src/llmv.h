@@ -18,17 +18,12 @@ typedef struct llmv_writer {
     int err;
 } llmv_writer;
 
-typedef enum llmv_flag {
-    LLMV_START = 1,
-    LLMV_END = 2,
-    LLMV_FIELD = 3,
-} llmv_flag;
-
 llmv_writer llmv_new_writer(unsigned char* buf, size_t size);
 
 int llmv_start(llmv_writer* w, const char* kind, const void* addr, size_t size);
 int llmv_field(llmv_writer* w, const char* name, const void* addr, size_t size);
 int llmv_end(llmv_writer* w);
+int llmv_close(llmv_writer* w);
 
 #define llmv_start_struct(w, kind, ps) \
     llmv_start(w, kind, ps, sizeof(*ps))

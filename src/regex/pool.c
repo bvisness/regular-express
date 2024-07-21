@@ -128,5 +128,7 @@ int pool_viz(Pool* p) {
         n = n->next;
     }
 
+    llmv_close(&w);
+
     return w.err;
 }
