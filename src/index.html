@@ -165,7 +165,7 @@
 	</div>
 
 	<div class="below-the-fold">
-		<div id="llmv"></div>
+		<div id="llmv" class="llmv-flex llmv-flex-column llmv-g3"></div>
 		<div class="site-width">
 			<h2>What is this?</h2>
 
@@ -414,7 +414,7 @@
 				regex.exports.mouseMove(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();
 			});
-			window.addEventListener('mousedown', e => {
+			canvasContainer.addEventListener('mousedown', e => {
 				const containerRect = canvasContainer.getBoundingClientRect();
 				regex.exports.mouseDown(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();

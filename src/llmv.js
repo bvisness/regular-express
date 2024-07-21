@@ -133,14 +133,9 @@ var Parser = class {
 
 // llmv.ts
 var LLMV = class {
-  /**
-   * px per byte
-   */
-  zoom;
-  constructor() {
-    this.zoom = 24;
-  }
   renderTape(tape) {
+    const zoom = tape.zoom ?? 24;
+    const elContainer = E("div", ["llmv-flex", "llmv-flex-column", "llmv-g3"]);
     let maxBars = 1;
     for (const region of tape.regions) {
       if (region.bars && region.bars.length > maxBars) {
@@ -158,18 +153,23 @@ var LLMV = class {
       const elFields = E("div", ["llmv-region-fields"]);
       for (const field of this.pad(region.addr, region.size, region.fields)) {
         const elField = E("div", ["llmv-field", "llmv-flex", "llmv-flex-column", "llmv-tc"]);
-        elField.style.width = this.width(field.size);
+        elField.style.width = this.width(field.size, zoom);
         if (Array.isArray(field.content)) {
           const elSubfields = E("div", ["llmv-flex"]);
           for (const subfield of this.pad(field.addr, field.size, field.content)) {
             if (Array.isArray(subfield.content)) {
               throw new Error("can't have sub-sub-fields");
             }
-            elSubfields.appendChild(FieldContent(subfield.content, "llmv-subfield"));
+            elSubfields.appendChild(FieldContent(subfield.content, {
+              klass: "llmv-subfield",
+              onclick: field.onclick
+            }));
           }
           elField.appendChild(elSubfields);
         } else {
-          elField.appendChild(FieldContent(field.content));
+          elField.appendChild(FieldContent(field.content, {
+            onclick: field.onclick
+          }));
         }
         if (field.name) {
           let name = field.name;
@@ -187,8 +187,8 @@ var LLMV = class {
       }
       const elBars = E("div", ["llmv-flex", "llmv-flex-column"], bars.map((bar) => {
         const elBar = E("div", ["llmv-bar"]);
-        elBar.style.marginLeft = this.width(bar.addr - region.addr);
-        elBar.style.width = this.width(bar.size);
+        elBar.style.marginLeft = this.width(bar.addr - region.addr, zoom);
+        elBar.style.width = this.width(bar.size, zoom);
         if (bar.color) {
           elBar.style.backgroundColor = bar.color;
         }
@@ -198,10 +198,18 @@ var LLMV = class {
       elRegion.appendChild(E("div", ["llmv-f3", "llmv-tc"], region.description));
       elTape.appendChild(elRegion);
     }
-    return elTape;
+    elContainer.append(elTape);
+    if (tape.children) {
+      const elChildren = E("div", ["llmv-pl3", "llmv-flex", "llmv-flex-column", "llmv-g3"]);
+      for (const child of tape.children) {
+        elChildren.appendChild(this.renderTape(child));
+      }
+      elContainer.append(elChildren);
+    }
+    return elContainer;
   }
-  width(size) {
-    return `${size * this.zoom}px`;
+  width(size, zoom) {
+    return `${Math.min(240, size * zoom)}px`;
   }
   pad(baseAddr, size, fields) {
     const res = [];
@@ -230,15 +238,21 @@ var LLMV = class {
 function Padding() {
   return E("div", ["llmv-flex-grow-1", "llmv-striped"]);
 }
-function FieldContent(content, klass) {
-  const classes = [klass, "llmv-flex-grow-1", "llmv-flex", "llmv-flex-column", "llmv-code", "llmv-f2"];
+function FieldContent(content, opts = {}) {
+  const classes = [opts.klass, opts.onclick && "llmv-clickable", "llmv-flex-grow-1", "llmv-flex", "llmv-flex-column", "llmv-code", "llmv-f2"];
+  let el;
   if (typeof content === "string") {
     classes.push("llmv-pa1");
-    return E("div", classes, [
+    el = E("div", classes, [
       content
     ]);
+  } else {
+    el = E("div", classes, content);
   }
-  return E("div", classes, content);
+  if (opts.onclick) {
+    el.addEventListener("click", opts.onclick);
+  }
+  return el;
 }
 function Byte(n) {
   return Hex(n, false);

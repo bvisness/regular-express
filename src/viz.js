@@ -1,12 +1,14 @@
-import { Hex, LLMV, Parser } from "./llmv.js"
+import { Hex, LLMV, Parser, E } from "./llmv.js"
 
 const llmv = new LLMV();
 
-let pools = [];
+let allPools = [];
 let cRegions = {};
 
+let openRegions = [];
+
 export function initViz() {
-  pools = [
+  allPools = [
     regex.getPool_Group(),
     regex.getPool_NoUnionEx(),
     regex.getPool_Regex(),
@@ -14,6 +16,31 @@ export function initViz() {
     regex.getPool_SetItem(),
     regex.getPool_Unit(),
   ];
+  openRegions = [
+    {
+      kind: "Pool",
+      addr: regex.getPool_Regex(),
+      children: [],
+    },
+    {
+      kind: "Pool",
+      addr: regex.getPool_Group(),
+      children: [],
+    },
+    {
+      kind: "Pool",
+      addr: regex.getPool_Unit(),
+      children: [],
+    },
+  ]
+}
+
+function addOpenChild(openRegion, kind, addr) {
+  openRegion.children.push({
+    kind: kind,
+    addr: addr,
+    children: [],
+  });
 }
 
 function subMem(addr, size) {
@@ -24,7 +51,7 @@ export function viz(el) {
   el.innerHTML = "";
 
   cRegions = {};
-  for (const pool of pools) {
+  for (const pool of allPools) {
     const err = regex.pool_viz(pool)
     if (err) {
       throw new Error("failed to visualize pool");
@@ -40,9 +67,42 @@ export function viz(el) {
   }
 
   // Render active stuff
-  el.appendChild(Pool(regex.getPool_Regex()));
-  el.appendChild(Pool(regex.getPool_Group()));
-  el.appendChild(Pool(regex.getPool_Unit()));
+  for (const r of openRegions) {
+    el.appendChild(llmv.renderTape(vizOpenRegion(r)));
+  }
+}
+
+function vizOpenRegion(r) {
+  const cRegion = getCRegion(r.kind, r.addr);
+  if (!cRegion) {
+    return E("div", [], `No ${r.kind} found at address ${Hex(r.addr)}`);
+  }
+
+  let tape = null;
+  switch (r.kind) {
+    case "Pool":
+      tape = Pool(r);
+      break;
+    case "cstring":
+      tape = CString(r.addr);
+      break;
+    case "PoolFreeNode":
+      tape = PoolFreeNode(r);
+      break;
+    default:
+      console.warn("Unknown open region kind", r.kind);
+      tape = {
+        regions: [{
+          addr: 0,
+          size: 0,
+          fields: [],
+          description: "???",
+        }],
+      };
+  }
+  tape.children = r.children.map(c => vizOpenRegion(c));
+
+  return tape;
 }
 
 function saveCRegion(cRegion) {
@@ -63,29 +123,58 @@ function must(v) {
   return v;
 }
 
-function Pool(addr) {
-  const pool = must(getCRegion("Pool", addr));
-  const nameField = getCField(pool, "name");
-  const name = must(getCRegion("cstring", littleEndian(subMem(nameField.addr, nameField.size))));
+function Pool(openRegion) {
+  const pool = must(getCRegion("Pool", openRegion.addr));
+  const name = must(getCRegion("cstring", ptrval(getCField(pool, "name"))));
 
-  const region = {
-    addr: pool.addr,
-    size: pool.size,
-    fields: [],
-    description: `Pool (${cstringToString(name)})`,
-  };
-  for (const f of pool.fields) {
-    region.fields.push({
-      addr: f.addr,
-      size: f.size,
-      name: f.name,
-      content: defaultCFieldContent(f),
-    });
-  }
-
-  return llmv.renderTape({
-    regions: [region],
+  const region = CStruct(pool, {
+    "name": {
+      onclick() {
+        addOpenChild(openRegion, "cstring", name.addr);
+      },
+    },
+    "head": {
+      onclick() {
+        addOpenChild(openRegion, "PoolFreeNode", ptrval(getCField(pool, "head")));
+      },
+    },
   });
+  region.description = `Pool (${cstringToString(name)})`;
+
+  return {
+    regions: [region],
+  };
+}
+
+function PoolFreeNode(openRegion) {
+  const node = must(getCRegion("PoolFreeNode", openRegion.addr));
+  return {
+    regions: [CStruct(node, {
+      "next": {
+        onclick() {
+          addOpenChild(openRegion, "PoolFreeNode", ptrval(getCField(node, "next")));
+        },
+      }
+    })],
+  };
+}
+
+function CStruct(cRegion, fieldOverrides = {}) {
+  return {
+    addr: cRegion.addr,
+    size: cRegion.size,
+    fields: cRegion.fields.map(cf => {
+      const override = fieldOverrides[cf.name] ?? {};
+      return {
+        addr: cf.addr,
+        size: cf.size,
+        name: override.name ?? cf.name,
+        content: override.content ?? defaultCFieldContent(cf),
+        onclick: override.onclick,
+      };
+    }),
+    description: cRegion.kind,
+  };
 }
 
 function getCField(cRegion, name) {
@@ -98,8 +187,11 @@ function getCField(cRegion, name) {
 }
 
 function defaultCFieldContent(f) {
-  const num = littleEndian(subMem(f.addr, f.size));
+  const num = intval(f);
 
+  if (f.size > 8) {
+    return `(${f.type} data)`;
+  }
   if (f.type[f.type.length-1] === "*") {
     return Hex(num) + "*";
   }
@@ -112,6 +204,14 @@ function littleEndian(bytes) {
     result |= BigInt(bytes[i] << (i * 8));
   }
   return result;
+}
+
+function ptrval(f) {
+  return intval(f);
+}
+
+function intval(f) {
+  return littleEndian(subMem(f.addr, f.size));
 }
 
 function cstringToString(f) {
@@ -127,4 +227,26 @@ function cstringToString(f) {
     res += String.fromCharCode(b);
   }
   return res;
+}
+
+function CString(addr) {
+  const cstr = must(getCRegion("cstring", addr));
+  const fields = [];
+  const strMem = subMem(cstr.addr, cstr.size);
+  for (let i = 0; i < cstr.size; i++) {
+    fields.push({
+      addr: cstr.addr + i,
+      size: 1,
+      name: String.fromCharCode(strMem[i]),
+      content: Hex(strMem[i], false),
+    });
+  }
+  return {
+    regions: [{
+      addr: cstr.addr,
+      size: cstr.size,
+      fields: fields,
+      description: `"${cstringToString(cstr)}"`,
+    }],
+  };
 }
