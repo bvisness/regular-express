@@ -14,10 +14,17 @@
                 "${env:windir}\\System32\\cmd.exe"
             ],
             "args": [
-                "/k", "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\VsDevCmd.bat"
+                "/k",
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\VsDevCmd.bat"
             ],
             "icon": "terminal-cmd"
         }
     },
     "terminal.integrated.defaultProfile.windows": "Developer Command Prompt",
+    "[c]": {
+        "editor.formatOnSave": false,
+    },
+    "[cpp]": {
+        "editor.formatOnSave": false,
+    },
 }

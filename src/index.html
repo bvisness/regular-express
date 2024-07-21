@@ -5,7 +5,9 @@
 	<meta charset="UTF-8">
 	<title>Regular Express</title>
 
+	<meta name="color-scheme" content="light only">
 	<link rel="stylesheet" href="normalize.css">
+	<link rel="stylesheet" href="llmv.css">
 
 	<style>
 		* {
@@ -17,7 +19,7 @@
 		}
 
 		.ui-container {
-			height: 100vh;
+			height: 620px;
 			display: flex;
 			flex-direction: column;
 			align-items: center;
@@ -138,7 +140,7 @@
 	</style>
 </head>
 
-<body>
+<body class="llmv-light">
 	<div class="ui-container">
 		<header class="site-width">
 			<span class="tagline-container">
@@ -216,7 +218,7 @@
 		}
 	</script>
 	<script type="module">
-		import { viz } from "./viz.js";
+		import { viz, initViz } from "./viz.js";
 
 		const header = document.querySelector('header');
 		const canvasContainer = document.querySelector('.canvas-container');
@@ -549,6 +551,10 @@
 			);
 			regex.exports.init();
 
+			const llmv = document.querySelector("#llmv");
+			initViz();
+			viz(llmv);
+
 			// TODO: The timer should probably have a cap or otherwise
 			// keep ticking in some other way. We have weird issues where
 			// the first mouse move after a while fast forwards time
@@ -570,6 +576,7 @@
 						header.getBoundingClientRect().width,
 						currentTime - lastTime
 					);
+					viz(llmv);
 
 					lastTime = currentTime;
 
@@ -584,9 +591,6 @@
 				}
 			}
 			wakeUp();
-
-			const llmv = document.querySelector("#llmv");
-			viz(llmv);
 		}
 		init();
 	</script>

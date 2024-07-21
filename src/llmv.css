@@ -1,7 +1,11 @@
 /* css/utils.css */
 :root {
-  --llmv-c1: white;
-  --llmv-c2: rgba(255, 255, 255, 0.6);
+  --llmv-c1-light: black;
+  --llmv-c2-light: rgba(0, 0, 0, 0.6);
+  --llmv-c1-dark: white;
+  --llmv-c2-dark: rgba(255, 255, 255, 0.6);
+  --llmv-c1: var(--llmv-c1-light);
+  --llmv-c2: var(--llmv-c2-light);
   --llmv-code:
     Consolas,
     monaco,
@@ -12,6 +16,20 @@
   --llmv-spacing-1: 0.25rem;
   --llmv-spacing-2: 0.5rem;
   --llmv-spacing-3: 1rem;
+}
+.llmv-light {
+  --llmv-c1: var(--llmv-c1-light);
+  --llmv-c2: var(--llmv-c2-light);
+}
+.llmv-dark {
+  --llmv-c1: var(--llmv-c1-dark);
+  --llmv-c2: var(--llmv-c2-dark);
+}
+@media (prefers-color-scheme: dark) {
+  .llmv-lightdark {
+    --llmv-c1: var(--llmv-c1-dark);
+    --llmv-c2: var(--llmv-c2-dark);
+  }
 }
 .llmv-c1 {
   color: var(--llmv-c1);
@@ -38,15 +56,19 @@
   font-size: var(--llmv-f3);
 }
 .llmv-bl {
+  border-left-style: solid;
   border-left-width: 1px;
 }
 .llmv-br {
+  border-right-style: solid;
   border-right-width: 1px;
 }
 .llmv-bt {
+  border-top-style: solid;
   border-top-width: 1px;
 }
 .llmv-bb {
+  border-bottom-style: solid;
   border-bottom-width: 1px;
 }
 .llmv-pl1 {

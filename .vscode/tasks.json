@@ -13,7 +13,7 @@
     },
     "tasks": [
         {
-            "label": "Build App",
+            "label": "Build App (Debug)",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -22,6 +22,20 @@
             "command": "python",
             "args": [
                 "build.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+            }
+        },
+        {
+            "label": "Build App (Release)",
+            "group": {
+                "kind": "build",
+            },
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "build.py", "release"
             ],
             "options": {
                 "cwd": "${workspaceFolder}",

@@ -70,9 +70,10 @@ var Parser = class {
                       {
                         this.consumeByte(LLMV_FIELD);
                         const field = {
+                          name: this.consumeString(),
+                          type: this.consumeString(),
                           addr: this.consume64(),
-                          size: this.consume64(),
-                          name: this.consumeString()
+                          size: this.consume64()
                         };
                         cRegion.fields.push(field);
                       }
@@ -230,7 +231,7 @@ function Padding() {
   return E("div", ["llmv-flex-grow-1", "llmv-striped"]);
 }
 function FieldContent(content, klass) {
-  const classes = [klass, "llmv-flex-grow-1", "llmv-pa1", "llmv-flex", "llmv-flex-column", "llmv-code", "llmv-f2"];
+  const classes = [klass, "llmv-flex-grow-1", "llmv-flex", "llmv-flex-column", "llmv-code", "llmv-f2"];
   if (typeof content === "string") {
     classes.push("llmv-pa1");
     return E("div", classes, [

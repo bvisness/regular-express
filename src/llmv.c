@@ -69,11 +69,12 @@ int llmv_end(llmv_writer* w) {
     return w->err;
 }
 
-int llmv_field(llmv_writer* w, const char* name, const void* addr, size_t size) {
+int llmv_field(llmv_writer* w, const char* name, const char* type, const void* addr, size_t size) {
     llmv_write_flag(w, LLMV_FIELD);
+    llmv_write_string(w, name);
+    llmv_write_string(w, type);
     llmv_write_ptr(w, addr);
     llmv_write_size(w, size);
-    llmv_write_string(w, name);
     return w->err;
 }
 

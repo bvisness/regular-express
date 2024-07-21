@@ -106,12 +106,12 @@ int pool_viz(Pool* p) {
     llmv_writer w = llmv_new_writer(vizbuf(), VIZBUF_SIZE);
 
     llmv_start_struct(&w, "Pool", p);
-    llmv_structfield(&w, p, name);
-    llmv_structfield(&w, p, buf);
-    llmv_structfield(&w, p, buf_len);
-    llmv_structfield(&w, p, chunk_size);
-    llmv_structfield(&w, p, count);
-    llmv_structfield(&w, p, head);
+    llmv_structfield(&w, p, const char*, name);
+    llmv_structfield(&w, p, unsigned char*, buf);
+    llmv_structfield(&w, p, size_t, buf_len);
+    llmv_structfield(&w, p, size_t, chunk_size);
+    llmv_structfield(&w, p, int, count);
+    llmv_structfield(&w, p, PoolFreeNode*, head);
     llmv_end(&w);
 
     llmv_cstring(&w, p->name);
@@ -122,7 +122,7 @@ int pool_viz(Pool* p) {
     PoolFreeNode* n = p->head;
     while (n) {
         llmv_start(&w, "PoolFreeNode", n, p->chunk_size);
-        llmv_structfield(&w, n, next);
+        llmv_structfield(&w, n, PoolFreeNode*, next);
         llmv_end(&w);
 
         n = n->next;
