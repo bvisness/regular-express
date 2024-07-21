@@ -163,6 +163,7 @@
 	</div>
 
 	<div class="below-the-fold">
+		<div id="llmv"></div>
 		<div class="site-width">
 			<h2>What is this?</h2>
 
@@ -215,6 +216,8 @@
 		}
 	</script>
 	<script type="module">
+		import { viz } from "./viz.js";
+
 		const header = document.querySelector('header');
 		const canvasContainer = document.querySelector('.canvas-container');
 		const canvas = document.querySelector('canvas');
@@ -581,6 +584,9 @@
 				}
 			}
 			wakeUp();
+
+			const llmv = document.querySelector("#llmv");
+			viz(llmv);
 		}
 		init();
 	</script>

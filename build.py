@@ -86,30 +86,41 @@ os.chdir('..')
 os.makedirs('build/dist', exist_ok=True)
 
 buildId = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8)) # so beautiful. so pythonic.
+def newFilename(filename):
+    basename = os.path.basename(filename)
+    parts = basename.split('.')
+    parts.insert(-1, buildId)
+    return '.'.join(parts)
 
 root = 'src/index.html'
 assets = [
+    'src/viz.js',
+    'src/llmv.js',
+    'src/llmv.css',
     'src/normalize.css',
     'build/regex.wasm',
     'build/sys.wasm',
 ]
 
-rootContents = open(root).read()
-
-def addId(filename, id):
-    parts = filename.split('.')
-    parts.insert(-1, buildId)
-    return '.'.join(parts)
-
+newAssetNames = []
 for asset in assets:
     basename = os.path.basename(asset)
-    newFilename = addId(basename, buildId)
-    shutil.copy(asset, 'build/dist/{}'.format(newFilename))
+    newname = newFilename(asset)
+    newAssetNames.append((basename, newname))
 
-    rootContents = rootContents.replace(basename, newFilename)
+for asset in assets + [root]:
+    newname = os.path.basename(asset) if asset == root else newFilename(asset)
+    if asset.endswith(".wasm"):
+        shutil.copy(asset, f"build/dist/{newname}")
+        continue
 
-with open('build/dist/index.html', 'w') as f:
-    f.write(rootContents)
+    contents = open(asset).read()
+    for replacement in newAssetNames:
+        original, new = replacement
+        contents = contents.replace(original, new)
+
+    with open(f"build/dist/{newname}", "w") as f:
+        f.write(contents)
 
 # Produce a WAT version of the code for inspection.
 if not RELEASE:
