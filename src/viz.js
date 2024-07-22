@@ -7,6 +7,11 @@ let cRegions = {};
 
 let openRegions = [];
 
+function baseRegex() {
+  // double pointer shenanigans
+  return Number(littleEndian(subMem(regex.regex.value, 4)));
+}
+
 export function initViz() {
   allPools = [
     regex.getPool_Group(),
@@ -16,22 +21,43 @@ export function initViz() {
     regex.getPool_SetItem(),
     regex.getPool_Unit(),
   ];
+
   openRegions = [
     {
-      kind: "Pool",
-      addr: regex.getPool_Regex(),
+      kind: "Regex",
+      addr: baseRegex(),
       children: [],
     },
-    {
-      kind: "Pool",
-      addr: regex.getPool_Group(),
-      children: [],
-    },
-    {
-      kind: "Pool",
-      addr: regex.getPool_Unit(),
-      children: [],
-    },
+    // {
+    //   kind: "Pool",
+    //   addr: regex.getPool_Group(),
+    //   children: [],
+    // },
+    // {
+    //   kind: "Pool",
+    //   addr: regex.getPool_NoUnionEx(),
+    //   children: [],
+    // },
+    // {
+    //   kind: "Pool",
+    //   addr: regex.getPool_Regex(),
+    //   children: [],
+    // },
+    // {
+    //   kind: "Pool",
+    //   addr: regex.getPool_Set(),
+    //   children: [],
+    // },
+    // {
+    //   kind: "Pool",
+    //   addr: regex.getPool_SetItem(),
+    //   children: [],
+    // },
+    // {
+    //   kind: "Pool",
+    //   addr: regex.getPool_Unit(),
+    //   children: [],
+    // },
   ]
 }
 
@@ -56,14 +82,15 @@ export function viz(el) {
     if (err) {
       throw new Error("failed to visualize pool");
     }
+    saveCRegionsFromVizbuf();
+  }
 
-    const buf = subMem(regex.vizbuf(), regex.vizbuf_size());
-    const parser = new Parser(buf);
-    const result = parser.parse();
-
-    for (const cRegion of result) {
-      saveCRegion(cRegion);
+  {
+    const err = regex.Regex_viz(baseRegex());
+    if (err) {
+      throw new Error("failed to visualize main regex");
     }
+    saveCRegionsFromVizbuf();
   }
 
   // Render active stuff
@@ -72,14 +99,35 @@ export function viz(el) {
   }
 }
 
+function saveCRegionsFromVizbuf() {
+  const buf = subMem(regex.vizbuf(), regex.vizbuf_size());
+  const parser = new Parser(buf);
+  const result = parser.parse();
+  for (const cRegion of result) {
+    saveCRegion(cRegion);
+  }
+}
+
 function vizOpenRegion(r) {
   const cRegion = getCRegion(r.kind, r.addr);
   if (!cRegion) {
-    return E("div", [], `No ${r.kind} found at address ${Hex(r.addr)}`);
+    return `No ${r.kind} found at address ${Hex(r.addr)}`;
   }
 
   let tape = null;
   switch (r.kind) {
+    case "Regex":
+      tape = Regex(r);
+      break;
+    case "Regex_UnionMembers":
+      tape = Regex_UnionMembers(r);
+      break;
+    case "NoUnionEx":
+      tape = NoUnionEx(r);
+      break;
+    case "TextInputState":
+      tape = TextInputState(r);
+      break;
     case "Pool":
       tape = Pool(r);
       break;
@@ -123,6 +171,137 @@ function must(v) {
   return v;
 }
 
+function Regex(openRegion) {
+  const regex = must(getCRegion("Regex", openRegion.addr));
+  const r = CStruct(regex, {
+    "NumUnionMembers": {
+      content: DecimalContent(getCField(regex, "NumUnionMembers")),
+    },
+    "UnionMembers": {
+      content: `${intval(getCField(regex, "NumUnionMembers"))} union members`,
+      onclick() {
+        addOpenChild(openRegion, "Regex_UnionMembers", getCField(regex, "UnionMembers").addr);
+      },
+    },
+    "Size": {
+      content: Vec2iContent(getCField(regex, "Size")),
+    },
+    "UnionSize": {
+      content: Vec2iContent(getCField(regex, "UnionSize")),
+    },
+    "WireHeight": {
+      content: DecimalContent(getCField(regex, "WireHeight")),
+    }
+  });
+  return {
+    regions: [r],
+  };
+}
+
+function Regex_UnionMembers(openRegion) {
+  const m = must(getCRegion("Regex_UnionMembers", openRegion.addr));
+  const num = intval({ addr: m.addr - 4, size: 4 }); // HACK!
+  const r = {
+    addr: m.addr,
+    size: m.size,
+    fields: [],
+    description: "Union Members",
+  };
+  for (let i = 0; i < num; i++) {
+    const addr = m.addr + (i * 4);
+    const exAddr = ptrval({ addr, size: 4 });
+    r.fields.push({
+      addr: addr,
+      size: 4,
+      name: `${i}`,
+      content: Hex(exAddr) + "*",
+      onclick() {
+        addOpenChild(openRegion, "NoUnionEx", exAddr);
+      },
+    });
+  }
+  return {
+    regions: [r],
+  };
+}
+
+function NoUnionEx(openRegion) {
+  const ex = must(getCRegion("NoUnionEx", openRegion.addr));
+  const r = CStruct(ex, {
+    "NumUnits": {
+      content: DecimalContent(getCField(ex, "NumUnits")),
+    },
+    "Units": {
+      content: `${intval(getCField(ex, "NumUnits"))} units`,
+      // onclick() {
+      //   addOpenChild(openRegion, "Regex_UnionMembers", getCField(regex, "UnionMembers").addr);
+      // },
+    },
+    "Index": {
+      content: DecimalContent(getCField(ex, "Index")),
+    },
+    "Size": {
+      content: Vec2iContent(getCField(ex, "Size")),
+    },
+    "WireHeight": {
+      content: DecimalContent(getCField(ex, "WireHeight")),
+    },
+    "TextState": {
+      onclick() {
+        addOpenChild(openRegion, "TextInputState", getCField(ex, "TextState").addr);
+      },
+    },
+    "ClickedUnitIndex": {
+      content: DecimalContent(getCField(ex, "ClickedUnitIndex")),
+    },
+  });
+  return {
+    regions: [r],
+  };
+}
+
+function TextInputState(openRegion) {
+  const ts = must(getCRegion("TextInputState", openRegion.addr));
+  const r = CStruct(ts, {
+    "InsertIndex": {
+      content: DecimalContent(getCField(ts, "InsertIndex")),
+    },
+    "CursorIndex": {
+      content: DecimalContent(getCField(ts, "CursorIndex")),
+    },
+    "CursorRight": {
+      content: DecimalContent(getCField(ts, "CursorRight")),
+    },
+    "SelectionBase": {
+      content: DecimalContent(getCField(ts, "SelectionBase")),
+    },
+  });
+  return {
+    regions: [r],
+  };
+}
+
+function Vec2iContent(f) {
+  const x = littleEndian(subMem(f.addr, 4));
+  const y = littleEndian(subMem(f.addr + 4, 4));
+  return [
+    {
+      addr: f.addr,
+      size: 4,
+      content: `${x}`,
+    },
+    {
+      addr: f.addr + 4,
+      size: 4,
+      content: `${y}`,
+    },
+  ];
+}
+
+function DecimalContent(f) {
+  return `${littleEndian(subMem(f.addr, f.size))}`;
+}
+
 function Pool(openRegion) {
   const pool = must(getCRegion("Pool", openRegion.addr));
   const name = must(getCRegion("cstring", ptrval(getCField(pool, "name"))));
@@ -148,14 +327,17 @@ function Pool(openRegion) {
 
 function PoolFreeNode(openRegion) {
   const node = must(getCRegion("PoolFreeNode", openRegion.addr));
+  const r = CStruct(node, {
+    "next": {
+      onclick() {
+        addOpenChild(openRegion, "PoolFreeNode", ptrval(getCField(node, "next")));
+      },
+    }
+  });
+  r.description = `PoolFreeNode (${Hex(r.size)} bytes)`;
+
   return {
-    regions: [CStruct(node, {
-      "next": {
-        onclick() {
-          addOpenChild(openRegion, "PoolFreeNode", ptrval(getCField(node, "next")));
-        },
-      }
-    })],
+    regions: [r],
   };
 }
 

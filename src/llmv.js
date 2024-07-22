@@ -134,6 +134,9 @@ var Parser = class {
 // llmv.ts
 var LLMV = class {
   renderTape(tape) {
+    if (typeof tape === "string") {
+      return E("div", [], tape);
+    }
     const zoom = tape.zoom ?? 24;
     const elContainer = E("div", ["llmv-flex", "llmv-flex-column", "llmv-g3"]);
     let maxBars = 1;
@@ -154,6 +157,8 @@ var LLMV = class {
       for (const field of this.pad(region.addr, region.size, region.fields)) {
         const elField = E("div", ["llmv-field", "llmv-flex", "llmv-flex-column", "llmv-tc"]);
         elField.style.width = this.width(field.size, zoom);
+        elField.setAttribute("data-addr-start", `${field.addr}`);
+        elField.setAttribute("data-addr-end", `${field.addr + field.size}`);
         if (Array.isArray(field.content)) {
           const elSubfields = E("div", ["llmv-flex"]);
           for (const subfield of this.pad(field.addr, field.size, field.content)) {

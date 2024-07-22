@@ -409,7 +409,7 @@
 				window.requestAnimationFrame(doFrame);
 			}
 
-			window.addEventListener('mousemove', e => {
+			canvasContainer.addEventListener('mousemove', e => {
 				const containerRect = canvasContainer.getBoundingClientRect();
 				regex.exports.mouseMove(e.clientX - containerRect.x, e.clientY - containerRect.y);
 				wakeUp();

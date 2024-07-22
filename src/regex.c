@@ -8,8 +8,10 @@
 #include "drag.h"
 #include "draw.h"
 #include "globals.h"
+#include "llmv.h"
 #include "prepass.h"
 #include "undo.h"
+#include "viz.h"
 
 #include "regex/alloc.h"
 #include "regex/parser.h"
@@ -453,4 +455,46 @@ int frame(int width, int height, int contentWidth, float dt) {
     }
 
     return ctx->animating;
+}
+
+int Regex_viz(Regex* r) {
+	llmv_writer w = llmv_new_writer(vizbuf(), vizbuf_size());
+
+	llmv_start_struct(&w, "Regex", r);
+	llmv_structfield(&w, r, int, NumUnionMembers);
+	llmv_field(&w, "UnionMembers", "struct NoUnionEx*", &r->UnionMembers, sizeof(r->UnionMembers));
+	llmv_structfield(&w, r, Vec2i, Size);
+	llmv_structfield(&w, r, Vec2i, UnionSize);
+	llmv_structfield(&w, r, int, WireHeight);
+	llmv_end(&w);
+
+	llmv_start(&w, "Regex_UnionMembers", r->UnionMembers, sizeof(r->UnionMembers));
+	for (int i = 0; i < r->NumUnionMembers; i++) {
+		llmv_field(&w, "", "struct NoUnionEx*", &r->UnionMembers[i], sizeof(struct NoUnionEx*));
+	}
+	llmv_end(&w);
+
+	for (int i = 0; i < r->NumUnionMembers; i++) {
+		NoUnionEx* ex = r->UnionMembers[i];
+		llmv_start_struct(&w, "NoUnionEx", ex);
+		llmv_structfield(&w, ex, int, NumUnits);
+		llmv_field(&w, "Units", "struct Unit*", &ex->Units, sizeof(ex->Units));
+		llmv_structfield(&w, ex, int, Index);
+		llmv_structfield(&w, ex, Vec2i, Size);
+		llmv_structfield(&w, ex, int, WireHeight);
+		llmv_structfield(&w, ex, TextInputState, TextState);
+		llmv_structfield(&w, ex, int, ClickedUnitIndex);
+		llmv_end(&w);
+
+		TextInputState* ts = &ex->TextState;
+		llmv_start_struct(&w, "TextInputState", ts);
+		llmv_structfield(&w, ts, int, InsertIndex);
+		llmv_structfield(&w, ts, int, CursorIndex);
+		llmv_structfield(&w, ts, int, CursorRight);
+		llmv_structfield(&w, ts, int, SelectionBase);
+		llmv_end(&w);
+	}
+
+	llmv_close(&w);
+	return w.err;
 }
